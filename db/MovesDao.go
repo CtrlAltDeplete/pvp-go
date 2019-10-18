@@ -1,0 +1,173 @@
+package db
+
+import (
+	"PvP-Go/models"
+	"database/sql"
+	"strings"
+)
+
+type MovesDao struct{}
+
+func (dao *MovesDao) FindSingleWhere(query string, params ...interface{}) (error, *models.Move) {
+	var (
+		id                           int64
+		name                         string
+		typeId, power, turns, energy int64
+		probability                  sql.NullFloat64
+		stageDelta                   sql.NullInt64
+		stats, target                sql.NullString
+		rows                         *sql.Rows
+		err                          error
+		count                        = 0
+	)
+	query = "SELECT * " +
+		"FROM pvpgo.moves " +
+		"WHERE " + query
+	rows, err = LIVE.Query(query, params...)
+	CheckError(err)
+	for rows.Next() {
+		count++
+		CheckError(rows.Scan(&id, &name, &typeId, &power, &turns, &energy, &probability, &stageDelta, &stats, &target))
+	}
+	CheckError(rows.Err())
+	CheckError(rows.Close())
+	if count == 0 {
+		return NO_ROWS, nil
+	} else if count == 1 {
+		return nil, newMove(id, name, typeId, power, turns, energy, probability, stageDelta, stats, target)
+	} else {
+		return MULTIPLE_ROWS, nil
+	}
+}
+
+func (dao *MovesDao) FindById(id int64) (error, *models.Move) {
+	var (
+		query = "id = ?"
+	)
+	return dao.FindSingleWhere(query, id)
+}
+
+func (dao *MovesDao) FindByName(name string) (error, *models.Move) {
+	var (
+		query = "name = ?"
+	)
+	return dao.FindSingleWhere(query, name)
+}
+
+func (dao *MovesDao) FindWhere(query string, params ...interface{}) *[]*models.Move {
+	var (
+		moves                        = []*models.Move{}
+		rows                         *sql.Rows
+		e                            error
+		id                           int64
+		name                         string
+		typeId, power, turns, energy int64
+		probability                  sql.NullFloat64
+		stageDelta                   sql.NullInt64
+		stats, target                sql.NullString
+	)
+	query = "SELECT * " +
+		"FROM pvpgo.moves " +
+		"WHERE " + query
+	rows, e = LIVE.Query(query, params...)
+	CheckError(e)
+	for rows.Next() {
+		CheckError(rows.Scan(&id, &name, &typeId, &power, &turns, &energy, &probability, &stageDelta, &stats, &target))
+		moves = append(moves, newMove(id, name, typeId, power, turns, energy, probability, stageDelta, stats, target))
+	}
+	CheckError(rows.Err())
+	CheckError(rows.Close())
+	return &moves
+}
+
+func (dao *MovesDao) FindByTypeId(id int64) *[]*models.Move {
+	var (
+		query = "type_id = ?"
+	)
+	return dao.FindWhere(query, id)
+}
+
+func (dao *MovesDao) FindByTypeIds(ids []int64) *[]*models.Move {
+	var (
+		id     int64
+		params []interface{}
+		query  = "type_id IN (?" + strings.Repeat(", ?", len(ids)-1) + ")"
+	)
+	for _, id = range ids {
+		params = append(params, id)
+	}
+	return dao.FindWhere(query, params...)
+}
+
+func (dao *MovesDao) FindAll() *[]*models.Move {
+	return dao.FindWhere("TRUE")
+}
+
+func (dao *MovesDao) Create(name string, typeId, power, turns, energy int64, probability, stageDelta, stats,
+	target interface{}) *models.Move {
+	var (
+		result sql.Result
+		e      error
+		id     int64
+		query  = "INSERT INTO pvpgo.moves (name, type_id, power, turns, energy, probability, stage_delta, stats, target) " +
+			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	)
+	result, e = LIVE.Exec(query, name, typeId, power, turns, energy, probability, stageDelta, stats, target)
+	CheckError(e)
+	id, e = result.LastInsertId()
+	CheckError(e)
+	return newMove(id, name, typeId, power, turns, energy, probability, stageDelta, stats, target)
+}
+
+func (dao *MovesDao) Save(move models.Move) {
+	var (
+		e     error
+		query = "UPDATE pvpgo.moves " +
+			"SET name = ?, " +
+			"type_id = ?, " +
+			"power = ?, " +
+			"turns = ?, " +
+			"energy = ? " +
+			"WHERE id = ?"
+	)
+	_, e = LIVE.Exec(query, move.Name(), move.TypeId(), int64(move.Power()), move.Turns(), move.Energy(), move.Id())
+	CheckError(e)
+}
+
+func (dao *MovesDao) Delete(move models.Move) {
+	var (
+		e     error
+		query = "DELETE FROM pvpgo.moves " +
+			"WHERE id = ?"
+	)
+	_, e = LIVE.Exec(query, move.Id())
+	CheckError(e)
+}
+
+func (dao *MovesDao) FindOrCreate(name string, typeId, power, turns, energy int64, probability, stageDelta, stats, target interface{}) *models.Move {
+	var (
+		move *models.Move
+		err  error
+	)
+	err, move = dao.FindByName(name)
+	if err != nil {
+		return dao.Create(name, typeId, power, turns, energy, probability, stageDelta, stats, target)
+	}
+	return move
+}
+
+func newMove(id int64, name string, typeId int64, power int64, turns int64, energy int64, probability interface{},
+	stageDelta interface{}, stats interface{}, target interface{}) *models.Move {
+	var m = models.Move{}
+	m.SetId(id)
+	m.SetName(name)
+	m.SetTypeId(typeId)
+	m.SetPower(float64(power))
+	m.SetTurns(turns)
+	m.SetEnergy(energy)
+	m.SetProbability(probability)
+	m.SetStageDelta(stageDelta)
+	m.SetStats(stats)
+	m.SetTarget(target)
+	return &m
+}
