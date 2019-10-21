@@ -3,7 +3,6 @@ package db
 import (
 	"PvP-Go/models"
 	"database/sql"
-	"log"
 	"strings"
 )
 
@@ -131,31 +130,41 @@ func (dao *TypesDao) FindAll() []models.PokemonType {
 	return pokemonTypes
 }
 
-func (dao *TypesDao) Create(firstType string, secondType interface{}, displayName string) *models.PokemonType {
+func (dao *TypesDao) Create(firstType string, secondType interface{}) (error, *models.PokemonType) {
 	var (
-		result sql.Result
-		e      error
-		id     int64
-		query  = "INSERT INTO pvpgo.types (first_type, second_type, display_name) " +
+		displayName string
+		result      sql.Result
+		err         error
+		id          int64
+		query       = "INSERT INTO pvpgo.types (first_type, second_type, display_name) " +
 			"VALUES (?, ?, ?)"
 	)
 	switch st := secondType.(type) {
 	case string:
-		result, e = LIVE.Exec(query, firstType, st, displayName)
+		displayName = firstType + "/" + st
+		result, err = LIVE.Exec(query, firstType, st, displayName)
 	case nil:
-		result, e = LIVE.Exec(query, firstType, sql.NullString{}, displayName)
+		result, err = LIVE.Exec(query, firstType, st, firstType)
 	case sql.NullString:
-		result, e = LIVE.Exec(query, firstType, st, displayName)
+		if st.Valid {
+			return dao.Create(firstType, st.String)
+		}
+		return dao.Create(firstType, nil)
 	default:
-		log.Fatalf("Unknown type %T.", st)
+		result = nil
+		err = TYPE_MISMATCH
 	}
-	CheckError(e)
-	id, e = result.LastInsertId()
-	CheckError(e)
-	return newPokemonType(id, firstType, secondType, displayName)
+	if err != nil {
+		return err, nil
+	}
+	id, err = result.LastInsertId()
+	if err != nil {
+		return err, nil
+	}
+	return nil, newPokemonType(id, firstType, secondType, displayName)
 }
 
-func (dao *TypesDao) Save(pokemonType models.PokemonType) {
+func (dao *TypesDao) Update(pokemonType models.PokemonType) {
 	var (
 		e     error
 		query = "UPDATE pvpgo.types " +
@@ -176,28 +185,6 @@ func (dao *TypesDao) Delete(pokemonType models.PokemonType) {
 	)
 	_, e = LIVE.Exec(query, pokemonType.Id())
 	CheckError(e)
-}
-
-func (dao *TypesDao) FindOrCreate(types []string) *models.PokemonType {
-	var (
-		pokemonType *models.PokemonType
-		err         error
-	)
-	if len(types) == 1 {
-		err, pokemonType = dao.FindSingleByType(types[0])
-		if err != nil {
-			return dao.Create(types[0], nil, types[0])
-		}
-		return pokemonType
-	} else if len(types) == 2 {
-		err, pokemonType = dao.FindSingleByTypes(types[0], types[1])
-		if err != nil {
-			return dao.Create(types[0], types[1], types[0]+"/"+types[1])
-		}
-		return pokemonType
-	}
-	log.Fatalf("TypesDao.Upsert() expected 1 or 2 tyeps; got %d", len(types))
-	return nil
 }
 
 func newPokemonType(id int64, firstType string, secondType interface{}, displayName string) *models.PokemonType {

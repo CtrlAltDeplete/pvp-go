@@ -9,9 +9,10 @@ import (
 )
 
 var (
-	LIVE                 = NewDB("USER", "PASSWORD", "ADDRESS")
+	LIVE                 = NewDB("user", "password", "host")
 	NO_ROWS              = errors.New("No rows found.")
 	MULTIPLE_ROWS        = errors.New("Multiple rows found.")
+	TYPE_MISMATCH        = errors.New("Incorrect parameter type for creation.")
 	MOVES_DAO            = MovesDao{}
 	POKEMON_DAO          = PokemonDao{}
 	POKEMON_HAS_MOVE_DAO = PokemonHasMoveDao{}
