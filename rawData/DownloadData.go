@@ -107,15 +107,33 @@ func ParseAllTypeCharts() {
 
 	baseTypes := []*models.PokemonType{}
 	for _, t := range BASE_TYPES {
-		baseTypes = append(baseTypes, typesDao.FindOrCreate([]string{t}))
+		err, bt := typesDao.FindSingleByType(t)
+		if err == db.NO_ROWS {
+			err, bt = typesDao.Create(t, nil)
+		}
+		db.CheckError(err)
+		baseTypes = append(baseTypes, bt)
 	}
 
 	var receivingType, actingType *models.PokemonType
+	var err error
 	for _, dto := range typeChartDtos {
 		FillTypeChartDto(&dto)
-		receivingType = typesDao.FindOrCreate(dto.types)
+		err, receivingType = typesDao.FindSingleByTypes(dto.types)
+		if err == db.NO_ROWS {
+			if len(dto.types) == 1 {
+				err, receivingType = typesDao.Create(dto.types[0], nil)
+			} else if len(dto.types) == 2 {
+				err, receivingType = typesDao.Create(dto.types[0], dto.types[1])
+			}
+		}
+		db.CheckError(err)
 		for _, actingType = range baseTypes {
-			multiplierDao.FindOrCreate(receivingType.Id(), actingType.Id(), dto.multipliers[actingType.DisplayName()])
+			err, _ = multiplierDao.FindByIds(receivingType.Id(), actingType.Id())
+			if err == db.NO_ROWS {
+				err, _ = multiplierDao.Create(receivingType.Id(), actingType.Id(), dto.multipliers[actingType.DisplayName()])
+			}
+			db.CheckError(err)
 		}
 	}
 }
@@ -275,14 +293,7 @@ func FillPokemonAndMovesetDto(dto *pokemonAndMovesetsDto, typeDao *db.TypesDao, 
 
 	var err error
 	var pokemonType *models.PokemonType
-	if len(types) == 1 {
-		err, pokemonType = typeDao.FindSingleByType(types[0])
-	} else if len(types) == 2 {
-		err, pokemonType = typeDao.FindSingleByTypes(types[0], types[1])
-	} else {
-		log.Printf("Cannot find PokemonType using %d types for %s.\n", len(types), dto.name)
-		return errors.New(fmt.Sprintf("Cannot find PokemonType using %d types for %s.\n", len(types), dto.name))
-	}
+	err, pokemonType = typeDao.FindSingleByTypes(types)
 	if err != nil {
 		log.Printf("Cannot find PokemonType for %v for %s.\n", types, dto.name)
 		return errors.New(fmt.Sprintf("Cannot find PokemonType for %v for %s.\n", types, dto.name))

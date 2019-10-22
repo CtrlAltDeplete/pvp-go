@@ -21,8 +21,7 @@ func TestTypesDao_FindSingleWhere(t *testing.T) {
 		setupSql  = "INSERT INTO pvpgo.types (first_type, display_name) " +
 			"VALUES (?, ?)"
 		teardownSql = "DELETE FROM pvpgo.types " +
-			"WHERE display_name = ? " +
-			"OR display_name = ?"
+			"WHERE display_name IN (?, ?)"
 	)
 
 	// Defer teardown
@@ -43,7 +42,7 @@ func TestTypesDao_FindSingleWhere(t *testing.T) {
 	// Prepare test variables
 	query = "id <= ? " +
 		"AND id >= ?"
-	params = append(params, typeId)
+	params = append(params, typeId, typeId)
 	expected = newPokemonType(typeId, typeNames[0], nil, typeNames[0])
 	err, actual = TYPES_DAO.FindSingleWhere(query, params...)
 	CheckError(err)
@@ -91,13 +90,12 @@ func TestTypesDao_FindWhere(t *testing.T) {
 		setupSql  = "INSERT INTO pvpgo.types (first_type, display_name) " +
 			"VALUES (?, ?)"
 		teardownSql = "DELETE FROM pvpgo.types " +
-			"WHERE display_name = ? " +
-			"OR display_name = ?"
+			"WHERE display_name IN (?, ?)"
 	)
 
 	// Defer teardown
 	defer func() {
-		_, err = LIVE.Exec(teardownSql)
+		_, err = LIVE.Exec(teardownSql, typeNames[0], typeNames[1])
 		CheckError(err)
 	}()
 
@@ -168,6 +166,9 @@ func TestTypesDao_Create(t *testing.T) {
 		fail(t, "TypesDao.Create failed on string/string", *expected, *actual)
 	}
 
+	_, err = LIVE.Exec(teardownSql, firstType)
+	CheckError(err)
+
 	/* string/nil */
 	// Prepare test variables
 	err, actual = TYPES_DAO.Create(firstType, nil)
@@ -178,6 +179,9 @@ func TestTypesDao_Create(t *testing.T) {
 	if !reflect.DeepEqual(*expected, *actual) {
 		fail(t, "TypesDao.Create failed on string/nil", *expected, *actual)
 	}
+
+	_, err = LIVE.Exec(teardownSql, firstType)
+	CheckError(err)
 
 	/* string/sql.NullString(valid) */
 	// Prepare test variables
@@ -194,6 +198,9 @@ func TestTypesDao_Create(t *testing.T) {
 		fail(t, "TypesDao.Create failed on sql.NullString(valid)", *expected, *actual)
 	}
 
+	_, err = LIVE.Exec(teardownSql, firstType)
+	CheckError(err)
+
 	/* string/sql.NullString(invalid) */
 	// Prepare test variables
 	secondType = sql.NullString{
@@ -209,13 +216,16 @@ func TestTypesDao_Create(t *testing.T) {
 		fail(t, "TypesDao.Create failed on sql.NullString(invalid)", *expected, *actual)
 	}
 
+	_, err = LIVE.Exec(teardownSql, firstType)
+	CheckError(err)
+
 	/* string/something */
 	// Prepare test variables
 	err, actual = TYPES_DAO.Create(firstType, float64(0))
 
 	// Check expected vs actual
-	if err != TYPE_MISMATCH {
-		fail(t, "TypesDao.Create failed on TYPE_MISMATCH", TYPE_MISMATCH, err)
+	if err != BAD_PARAMS {
+		fail(t, "TypesDao.Create failed on BAD_PARAMS", BAD_PARAMS, err)
 	}
 }
 
@@ -223,7 +233,7 @@ func TestTypesDao_Update(t *testing.T) {
 	// Initialize test variables
 	var (
 		firstType   = "Test"
-		secondType  string
+		secondType  sql.NullString
 		displayName string
 		typeId      int64
 		result      sql.Result
@@ -251,9 +261,10 @@ func TestTypesDao_Update(t *testing.T) {
 	typeId, err = result.LastInsertId()
 	CheckError(err)
 	expected = newPokemonType(typeId, firstType, firstType, firstType+"/"+firstType)
+	TYPES_DAO.Update(*expected)
 	err = LIVE.QueryRow(verifySql, typeId).Scan(&typeId, &firstType, &secondType, &displayName)
 	CheckError(err)
-	actual = newPokemonType(typeId, firstType, setupSql, displayName)
+	actual = newPokemonType(typeId, firstType, secondType, displayName)
 
 	// Check expected vs actual
 	if !reflect.DeepEqual(*expected, *actual) {
@@ -262,5 +273,42 @@ func TestTypesDao_Update(t *testing.T) {
 }
 
 func TestTypesDao_Delete(t *testing.T) {
-	// TODO: finish test
+	// Initialize test variables
+	var (
+		firstType   = "Test"
+		typeId      int64
+		result      sql.Result
+		err         error
+		pokemonType *models.PokemonType
+		expected    int64 = 0
+		actual      int64
+		setupSql    = "INSERT INTO pvpgo.types (first_type, display_name) " +
+			"VALUES (?, ?)"
+		verifySql = "SELECT COUNT(*) " +
+			"FROM pvpgo.types " +
+			"WHERE first_type = ?"
+		teardownSql = "DELETE FROM pvpgo.types " +
+			"WHERE first_type = ?"
+	)
+
+	// Defer teardown
+	defer func() {
+		_, err = LIVE.Exec(teardownSql, firstType)
+		CheckError(err)
+	}()
+
+	// Prepare test variables
+	result, err = LIVE.Exec(setupSql, firstType, firstType)
+	CheckError(err)
+	typeId, err = result.LastInsertId()
+	CheckError(err)
+	pokemonType = newPokemonType(typeId, firstType, nil, firstType)
+	TYPES_DAO.Delete(*pokemonType)
+	err = LIVE.QueryRow(verifySql, firstType).Scan(&actual)
+	CheckError(err)
+
+	// Check expected vs actual
+	if !reflect.DeepEqual(expected, actual) {
+		fail(t, "TypesDao.Delete failed", expected, actual)
+	}
 }

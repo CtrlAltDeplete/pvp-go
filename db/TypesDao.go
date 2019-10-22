@@ -26,6 +26,9 @@ func (dao *TypesDao) FindSingleWhere(query string, params ...interface{}) (error
 	for rows.Next() {
 		count++
 		CheckError(rows.Scan(&id, &firstType, &secondType, &displayName))
+		if count > 1 {
+			break
+		}
 	}
 	CheckError(rows.Err())
 	CheckError(rows.Close())
@@ -53,13 +56,17 @@ func (dao *TypesDao) FindSingleByType(t string) (error, *models.PokemonType) {
 	return dao.FindSingleWhere(query, t)
 }
 
-func (dao *TypesDao) FindSingleByTypes(t1 string, t2 string) (error, *models.PokemonType) {
-	var (
-		query = "first_type IN (?, ?) " +
+func (dao *TypesDao) FindSingleByTypes(t []string) (error, *models.PokemonType) {
+	if len(t) == 1 {
+		return dao.FindSingleByType(t[0])
+	} else if len(t) == 2 {
+		var query = "first_type IN (?, ?) " +
 			"AND second_type IN (?, ?) " +
 			"LIMIT 1"
-	)
-	return dao.FindSingleWhere(query, t1, t2, t1, t2)
+		return dao.FindSingleWhere(query, t[0], t[1], t[0], t[1])
+	} else {
+		return BAD_PARAMS, nil
+	}
 }
 
 func (dao *TypesDao) FindWhere(query string, params ...interface{}) []models.PokemonType {
@@ -144,7 +151,8 @@ func (dao *TypesDao) Create(firstType string, secondType interface{}) (error, *m
 		displayName = firstType + "/" + st
 		result, err = LIVE.Exec(query, firstType, st, displayName)
 	case nil:
-		result, err = LIVE.Exec(query, firstType, st, firstType)
+		displayName = firstType
+		result, err = LIVE.Exec(query, firstType, st, displayName)
 	case sql.NullString:
 		if st.Valid {
 			return dao.Create(firstType, st.String)
@@ -152,7 +160,7 @@ func (dao *TypesDao) Create(firstType string, secondType interface{}) (error, *m
 		return dao.Create(firstType, nil)
 	default:
 		result = nil
-		err = TYPE_MISMATCH
+		err = BAD_PARAMS
 	}
 	if err != nil {
 		return err, nil

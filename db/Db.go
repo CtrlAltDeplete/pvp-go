@@ -6,13 +6,16 @@ import (
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"log"
+	"os"
 )
 
 var (
-	LIVE                 = NewDB("user", "password", "host")
+	LIVE = NewDB(os.Getenv("pvp-go.db.user"),
+		os.Getenv("pvp-go.db.password"),
+		os.Getenv("pvp-go.db.endpoint"))
 	NO_ROWS              = errors.New("No rows found.")
 	MULTIPLE_ROWS        = errors.New("Multiple rows found.")
-	TYPE_MISMATCH        = errors.New("Incorrect parameter type for creation.")
+	BAD_PARAMS           = errors.New("Bad parameters for DAO.")
 	MOVES_DAO            = MovesDao{}
 	POKEMON_DAO          = PokemonDao{}
 	POKEMON_HAS_MOVE_DAO = PokemonHasMoveDao{}
@@ -27,7 +30,7 @@ func CheckError(e error) {
 }
 
 func NewDB(user, password, address string) *sql.DB {
-	db, e := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:3306)/pvpgo", user, password, address))
+	db, e := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s)/pvpgo", user, password, address))
 	CheckError(e)
 	return db
 }

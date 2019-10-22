@@ -1,54 +1,109 @@
 package db
 
-import "database/sql"
+import (
+	"PvP-Go/models"
+	"database/sql"
+)
 
 type TypeMultipliersDao struct{}
 
-func (dao *TypeMultipliersDao) FindByIds(receivingType, actingType int64) (error, *float64) {
+func (dao *TypeMultipliersDao) FindSingleWhere(query string, params ...interface{}) (error, *models.TypeMultiplier) {
 	var (
-		multiplier float64
-		query      = "SELECT multiplier " +
-			"FROM pvpgo.type_multipliers " +
-			"WHERE acting_type = ? " +
-			"AND receiving_type = ?"
-		rows  *sql.Rows
-		err   error
-		count = 0
+		id            int64
+		receivingType int64
+		actingType    int64
+		multiplier    float64
+		rows          *sql.Rows
+		err           error
+		count         = 0
 	)
-	rows, err = LIVE.Query(query, actingType, receivingType)
+	query = "SELECT * " +
+		"FROM pvpgo.type_multipliers " +
+		"WHERE " + query
+	rows, err = LIVE.Query(query, params...)
 	CheckError(err)
 	for rows.Next() {
 		count++
-		CheckError(rows.Scan(&multiplier))
+		CheckError(rows.Scan(&id, &receivingType, &actingType, &multiplier))
+		if count > 1 {
+			break
+		}
 	}
 	CheckError(rows.Err())
 	CheckError(rows.Close())
 	if count == 0 {
 		return NO_ROWS, nil
+	} else if count == 1 {
+		return nil, newTypeMultiplier(id, receivingType, actingType, multiplier)
 	} else {
-		return nil, &multiplier
+		return MULTIPLE_ROWS, nil
 	}
 }
 
-func (dao *TypeMultipliersDao) Create(receivingType, actingType int64, multiplier float64) float64 {
+func (dao *TypeMultipliersDao) FindByIds(receivingType, actingType int64) (error, *models.TypeMultiplier) {
 	var (
-		e     error
-		query = "INSERT INTO pvpgo.type_multipliers (receiving_type, acting_type, multiplier) " +
-			"VALUES (?, ?, ?)"
+		query = "receiving_type = ? " +
+			"AND acting_type = ?"
 	)
-	_, e = LIVE.Exec(query, receivingType, actingType, multiplier)
-	CheckError(e)
-	return multiplier
+	return dao.FindSingleWhere(query, receivingType, actingType)
 }
 
-func (dao *TypeMultipliersDao) FindOrCreate(receivingType, actingType int64, multiplier float64) float64 {
+func (dao *TypeMultipliersDao) FindWhere(query string, params ...interface{}) []models.TypeMultiplier {
 	var (
-		mult *float64
-		err  error
+		typeMultipliers = []models.TypeMultiplier{}
+		rows            *sql.Rows
+		err             error
+		id              int64
+		receivingType   int64
+		actingType      int64
+		multiplier      float64
 	)
-	err, mult = dao.FindByIds(receivingType, actingType)
-	if err != nil {
-		return dao.Create(receivingType, actingType, multiplier)
+	query = "SELECT * " +
+		"FROM pvpgo.type_multipliers " +
+		"WHERE " + query
+	rows, err = LIVE.Query(query, params...)
+	CheckError(err)
+	for rows.Next() {
+		CheckError(rows.Scan(&id, &receivingType, &actingType, &multiplier))
+		typeMultipliers = append(typeMultipliers, *newTypeMultiplier(id, receivingType, actingType, multiplier))
 	}
-	return *mult
+	CheckError(rows.Err())
+	CheckError(rows.Close())
+	return typeMultipliers
+}
+
+func (dao *TypeMultipliersDao) FindAllByReceivingType(receivingType int64) []models.TypeMultiplier {
+	var (
+		query = "receiving_type = ?"
+	)
+	return dao.FindWhere(query, receivingType)
+}
+
+func (dao *TypeMultipliersDao) FindAllByActingType(actingType int64) []models.TypeMultiplier {
+	var (
+		query = "acting_type = ?"
+	)
+	return dao.FindWhere(query, actingType)
+}
+
+func (dao *TypeMultipliersDao) Create(receivingType, actingType int64, multiplier float64) (error, *models.TypeMultiplier) {
+	// TODO: Finish create function
+	return nil, nil
+}
+
+func (dao *TypeMultipliersDao) Update(typeMultiplier models.TypeMultiplier) {
+	// TODO: Finish update function
+}
+
+func (dao *TypeMultipliersDao) Delete(typeMultiplier models.TypeMultiplier) {
+	// TODO: Finish delete function
+}
+
+func newTypeMultiplier(id int64, receivingType int64, actingType int64, multiplier float64) *models.TypeMultiplier {
+	var tm = models.TypeMultiplier{}
+	tm.SetId(id)
+	tm.SetReceivingType(receivingType)
+	tm.SetActingType(actingType)
+	tm.SetMultiplier(multiplier)
+	return &tm
 }
