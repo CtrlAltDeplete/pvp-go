@@ -11,7 +11,6 @@ func TestTypesDao_FindSingleWhere(t *testing.T) {
 	// Initialize test variables
 	var (
 		query     string
-		params    []interface{}
 		typeId    int64
 		typeNames = []string{"Test1", "Test2"}
 		result    sql.Result
@@ -35,16 +34,15 @@ func TestTypesDao_FindSingleWhere(t *testing.T) {
 	CheckError(err)
 	typeId, err = result.LastInsertId()
 	CheckError(err)
-	result, err = LIVE.Exec(setupSql, typeNames[1], typeNames[1])
+	_, err = LIVE.Exec(setupSql, typeNames[1], typeNames[1])
 	CheckError(err)
 
 	/* Happy Path Test */
 	// Prepare test variables
 	query = "id <= ? " +
 		"AND id >= ?"
-	params = append(params, typeId, typeId)
 	expected = newPokemonType(typeId, typeNames[0], nil, typeNames[0])
-	err, actual = TYPES_DAO.FindSingleWhere(query, params...)
+	err, actual = TYPES_DAO.FindSingleWhere(query, typeId, typeId)
 	CheckError(err)
 
 	// Check expected vs actual
@@ -55,8 +53,7 @@ func TestTypesDao_FindSingleWhere(t *testing.T) {
 	/* No Results Test */
 	// Prepare test variables
 	query = "id <= ?"
-	params = append(*new([]interface{}), 0)
-	err, _ = TYPES_DAO.FindSingleWhere(query, params...)
+	err, _ = TYPES_DAO.FindSingleWhere(query, 0)
 
 	// Check expected vs actual
 	if err != NO_ROWS {
@@ -66,8 +63,7 @@ func TestTypesDao_FindSingleWhere(t *testing.T) {
 	/* Multiplier Results Test */
 	// Prepare test variables
 	query = "id >= ?"
-	params = append(*new([]interface{}), typeId)
-	err, _ = TYPES_DAO.FindSingleWhere(query, params...)
+	err, _ = TYPES_DAO.FindSingleWhere(query, typeId)
 
 	// Check expected vs actual
 	if err != MULTIPLE_ROWS {
@@ -79,9 +75,8 @@ func TestTypesDao_FindWhere(t *testing.T) {
 	// Initialize test variables
 	var (
 		query     string
-		params    []interface{}
-		type1id   int64
-		type2id   int64
+		id        int64
+		typeIds   []int64
 		typeNames = []string{"Test1", "Test2"}
 		result    sql.Result
 		err       error
@@ -102,34 +97,34 @@ func TestTypesDao_FindWhere(t *testing.T) {
 	// Test setup
 	result, err = LIVE.Exec(setupSql, typeNames[0], typeNames[0])
 	CheckError(err)
-	type1id, err = result.LastInsertId()
+	id, err = result.LastInsertId()
 	CheckError(err)
+	typeIds = append(typeIds, id)
 	result, err = LIVE.Exec(setupSql, typeNames[1], typeNames[1])
 	CheckError(err)
-	type2id, err = result.LastInsertId()
+	id, err = result.LastInsertId()
 	CheckError(err)
+	typeIds = append(typeIds, id)
 
 	/* No Results Test */
 	// Prepare test variables
 	query = "id <= ?"
-	params = append(*new([]interface{}), 0)
 	expected = []models.PokemonType{}
-	actual = TYPES_DAO.FindWhere(query, params...)
+	actual = TYPES_DAO.FindWhere(query, 0)
 
 	// Check expected vs actual
 	if !reflect.DeepEqual(expected, actual) {
 		fail(t, "TypesDao.FindWhere failed on no results", expected, actual)
 	}
 
-	/* Multiplier Results Test */
+	/* Multiple Results Test */
 	// Prepare test variables
 	query = "id IN (?, ?)"
-	params = append(*new([]interface{}), type1id, type2id)
 	expected = []models.PokemonType{
-		*newPokemonType(type1id, typeNames[0], nil, typeNames[0]),
-		*newPokemonType(type2id, typeNames[1], nil, typeNames[1]),
+		*newPokemonType(typeIds[0], typeNames[0], nil, typeNames[0]),
+		*newPokemonType(typeIds[1], typeNames[1], nil, typeNames[1]),
 	}
-	actual = TYPES_DAO.FindWhere(query, params...)
+	actual = TYPES_DAO.FindWhere(query, typeIds[0], typeIds[1])
 
 	// Check expected vs actual
 	if !reflect.DeepEqual(expected, actual) {

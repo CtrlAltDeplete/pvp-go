@@ -87,16 +87,46 @@ func (dao *TypeMultipliersDao) FindAllByActingType(actingType int64) []models.Ty
 }
 
 func (dao *TypeMultipliersDao) Create(receivingType, actingType int64, multiplier float64) (error, *models.TypeMultiplier) {
-	// TODO: Finish create function
-	return nil, nil
+	var (
+		result sql.Result
+		err    error
+		id     int64
+		query  = "INSERT INTO pvpgo.type_multipliers (receiving_type, acting_type, multiplier) " +
+			"VALUES (?, ?, ?)"
+	)
+	result, err = LIVE.Exec(query, receivingType, actingType, multiplier)
+	if err != nil {
+		return err, nil
+	}
+	id, err = result.LastInsertId()
+	if err != nil {
+		return err, nil
+	}
+	return nil, newTypeMultiplier(id, receivingType, actingType, multiplier)
 }
 
 func (dao *TypeMultipliersDao) Update(typeMultiplier models.TypeMultiplier) {
-	// TODO: Finish update function
+	var (
+		err   error
+		query = "UPDATE pvpgo.type_multipliers " +
+			"SET receiving_type = ?, " +
+			"acting_type = ?, " +
+			"multiplier = ? " +
+			"WHERE id = ?"
+	)
+	_, err = LIVE.Exec(query, typeMultiplier.ReceivingType(), typeMultiplier.ActingType(), typeMultiplier.Multiplier(),
+		typeMultiplier.Id())
+	CheckError(err)
 }
 
 func (dao *TypeMultipliersDao) Delete(typeMultiplier models.TypeMultiplier) {
-	// TODO: Finish delete function
+	var (
+		err   error
+		query = "DELETE FROM pvpgo.type_multipliers " +
+			"WHERE id = ?"
+	)
+	_, err = LIVE.Exec(query, typeMultiplier.Id())
+	CheckError(err)
 }
 
 func newTypeMultiplier(id int64, receivingType int64, actingType int64, multiplier float64) *models.TypeMultiplier {
