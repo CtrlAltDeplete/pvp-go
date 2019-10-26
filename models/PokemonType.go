@@ -37,6 +37,10 @@ func (p *PokemonType) SecondType() string {
 	return p.secondType.String
 }
 
+func (p *PokemonType) SecondTypeNullable() sql.NullString {
+	return p.secondType
+}
+
 func (p *PokemonType) SetSecondType(secondType interface{}) {
 	switch st := secondType.(type) {
 	case string:

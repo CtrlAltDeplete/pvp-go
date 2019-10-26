@@ -54,9 +54,9 @@ func (dao *MovesDao) FindByName(name string) (error, *models.Move) {
 	return dao.FindSingleWhere(query, name)
 }
 
-func (dao *MovesDao) FindWhere(query string, params ...interface{}) *[]*models.Move {
+func (dao *MovesDao) FindWhere(query string, params ...interface{}) []models.Move {
 	var (
-		moves                        = []*models.Move{}
+		moves                        = []models.Move{}
 		rows                         *sql.Rows
 		e                            error
 		id                           int64
@@ -73,21 +73,21 @@ func (dao *MovesDao) FindWhere(query string, params ...interface{}) *[]*models.M
 	CheckError(e)
 	for rows.Next() {
 		CheckError(rows.Scan(&id, &name, &typeId, &power, &turns, &energy, &probability, &stageDelta, &stats, &target))
-		moves = append(moves, newMove(id, name, typeId, power, turns, energy, probability, stageDelta, stats, target))
+		moves = append(moves, *newMove(id, name, typeId, power, turns, energy, probability, stageDelta, stats, target))
 	}
 	CheckError(rows.Err())
 	CheckError(rows.Close())
-	return &moves
+	return moves
 }
 
-func (dao *MovesDao) FindByTypeId(id int64) *[]*models.Move {
+func (dao *MovesDao) FindByTypeId(id int64) []models.Move {
 	var (
 		query = "type_id = ?"
 	)
 	return dao.FindWhere(query, id)
 }
 
-func (dao *MovesDao) FindByTypeIds(ids []int64) *[]*models.Move {
+func (dao *MovesDao) FindByTypeIds(ids []int64) []models.Move {
 	var (
 		id     int64
 		params []interface{}
@@ -99,27 +99,31 @@ func (dao *MovesDao) FindByTypeIds(ids []int64) *[]*models.Move {
 	return dao.FindWhere(query, params...)
 }
 
-func (dao *MovesDao) FindAll() *[]*models.Move {
+func (dao *MovesDao) FindAll() []models.Move {
 	return dao.FindWhere("TRUE")
 }
 
 func (dao *MovesDao) Create(name string, typeId, power, turns, energy int64, probability, stageDelta, stats,
-	target interface{}) *models.Move {
+	target interface{}) (error, *models.Move) {
 	var (
 		result sql.Result
-		e      error
+		err    error
 		id     int64
 		query  = "INSERT INTO pvpgo.moves (name, type_id, power, turns, energy, probability, stage_delta, stats, target) " +
 			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
 	)
-	result, e = LIVE.Exec(query, name, typeId, power, turns, energy, probability, stageDelta, stats, target)
-	CheckError(e)
-	id, e = result.LastInsertId()
-	CheckError(e)
-	return newMove(id, name, typeId, power, turns, energy, probability, stageDelta, stats, target)
+	result, err = LIVE.Exec(query, name, typeId, power, turns, energy, probability, stageDelta, stats, target)
+	if err != nil {
+		return err, nil
+	}
+	id, err = result.LastInsertId()
+	if err != nil {
+		return err, nil
+	}
+	return nil, newMove(id, name, typeId, power, turns, energy, probability, stageDelta, stats, target)
 }
 
-func (dao *MovesDao) Save(move models.Move) {
+func (dao *MovesDao) Update(move models.Move) {
 	var (
 		e     error
 		query = "UPDATE pvpgo.moves " +
@@ -127,10 +131,15 @@ func (dao *MovesDao) Save(move models.Move) {
 			"type_id = ?, " +
 			"power = ?, " +
 			"turns = ?, " +
-			"energy = ? " +
+			"energy = ?, " +
+			"probability = ?, " +
+			"stage_delta = ?, " +
+			"stats = ?, " +
+			"target = ? " +
 			"WHERE id = ?"
 	)
-	_, e = LIVE.Exec(query, move.Name(), move.TypeId(), int64(move.Power()), move.Turns(), move.Energy(), move.Id())
+	_, e = LIVE.Exec(query, move.Name(), move.TypeId(), int64(move.Power()), move.Turns(), move.Energy(),
+		move.ProbabilityNullable(), move.StageDeltaNullable(), move.StatsNullable(), move.TargetNullable(), move.Id())
 	CheckError(e)
 }
 
@@ -142,18 +151,6 @@ func (dao *MovesDao) Delete(move models.Move) {
 	)
 	_, e = LIVE.Exec(query, move.Id())
 	CheckError(e)
-}
-
-func (dao *MovesDao) FindOrCreate(name string, typeId, power, turns, energy int64, probability, stageDelta, stats, target interface{}) *models.Move {
-	var (
-		move *models.Move
-		err  error
-	)
-	err, move = dao.FindByName(name)
-	if err != nil {
-		return dao.Create(name, typeId, power, turns, energy, probability, stageDelta, stats, target)
-	}
-	return move
 }
 
 func newMove(id int64, name string, typeId int64, power int64, turns int64, energy int64, probability interface{},

@@ -73,7 +73,7 @@ func (dao *TypesDao) FindWhere(query string, params ...interface{}) []models.Pok
 	var (
 		pokemonTypes = []models.PokemonType{}
 		rows         *sql.Rows
-		e            error
+		err          error
 		id           int64
 		firstType    string
 		secondType   sql.NullString
@@ -82,8 +82,8 @@ func (dao *TypesDao) FindWhere(query string, params ...interface{}) []models.Pok
 	query = "SELECT * " +
 		"FROM pvpgo.types " +
 		"WHERE " + query
-	rows, e = LIVE.Query(query, params...)
-	CheckError(e)
+	rows, err = LIVE.Query(query, params...)
+	CheckError(err)
 	for rows.Next() {
 		CheckError(rows.Scan(&id, &firstType, &secondType, &displayName))
 		pokemonTypes = append(pokemonTypes, *newPokemonType(id, firstType, secondType, displayName))
@@ -181,7 +181,8 @@ func (dao *TypesDao) Update(pokemonType models.PokemonType) {
 			"display_name = ? " +
 			"WHERE id = ?"
 	)
-	_, e = LIVE.Exec(query, pokemonType.FirstType(), pokemonType.SecondType(), pokemonType.DisplayName(), pokemonType.Id())
+	_, e = LIVE.Exec(query, pokemonType.FirstType(), pokemonType.SecondTypeNullable(), pokemonType.DisplayName(),
+		pokemonType.Id())
 	CheckError(e)
 }
 

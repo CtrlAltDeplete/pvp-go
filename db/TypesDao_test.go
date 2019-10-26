@@ -135,20 +135,15 @@ func TestTypesDao_FindWhere(t *testing.T) {
 func TestTypesDao_Create(t *testing.T) {
 	// Initialize test variables
 	var (
-		firstType   = "Test"
-		secondType  sql.NullString
-		err         error
-		expected    *models.PokemonType
-		actual      *models.PokemonType
-		teardownSql = "DELETE FROM pvpgo.types " +
-			"WHERE first_type = ?"
+		firstType  = "Test"
+		secondType sql.NullString
+		err        error
+		expected   *models.PokemonType
+		actual     *models.PokemonType
 	)
 
 	// Defer teardown
-	defer func() {
-		_, err = LIVE.Exec(teardownSql, firstType)
-		CheckError(err)
-	}()
+	defer fakeTypeTeardown()
 
 	/* string/string */
 	// Prepare test variables
@@ -161,8 +156,7 @@ func TestTypesDao_Create(t *testing.T) {
 		fail(t, "TypesDao.Create failed on string/string", *expected, *actual)
 	}
 
-	_, err = LIVE.Exec(teardownSql, firstType)
-	CheckError(err)
+	fakeTypeTeardown()
 
 	/* string/nil */
 	// Prepare test variables
@@ -175,8 +169,7 @@ func TestTypesDao_Create(t *testing.T) {
 		fail(t, "TypesDao.Create failed on string/nil", *expected, *actual)
 	}
 
-	_, err = LIVE.Exec(teardownSql, firstType)
-	CheckError(err)
+	fakeTypeTeardown()
 
 	/* string/sql.NullString(valid) */
 	// Prepare test variables
@@ -193,8 +186,7 @@ func TestTypesDao_Create(t *testing.T) {
 		fail(t, "TypesDao.Create failed on sql.NullString(valid)", *expected, *actual)
 	}
 
-	_, err = LIVE.Exec(teardownSql, firstType)
-	CheckError(err)
+	fakeTypeTeardown()
 
 	/* string/sql.NullString(invalid) */
 	// Prepare test variables
@@ -211,8 +203,7 @@ func TestTypesDao_Create(t *testing.T) {
 		fail(t, "TypesDao.Create failed on sql.NullString(invalid)", *expected, *actual)
 	}
 
-	_, err = LIVE.Exec(teardownSql, firstType)
-	CheckError(err)
+	fakeTypeTeardown()
 
 	/* string/something */
 	// Prepare test variables
@@ -231,30 +222,19 @@ func TestTypesDao_Update(t *testing.T) {
 		secondType  sql.NullString
 		displayName string
 		typeId      int64
-		result      sql.Result
 		err         error
 		expected    *models.PokemonType
 		actual      *models.PokemonType
-		setupSql    = "INSERT INTO pvpgo.types (first_type, display_name) " +
-			"VALUES (?, ?)"
-		verifySql = "SELECT id, first_type, second_type, display_name " +
+		verifySql   = "SELECT id, first_type, second_type, display_name " +
 			"FROM pvpgo.types " +
 			"WHERE id = ?"
-		teardownSql = "DELETE FROM pvpgo.types " +
-			"WHERE first_type = ?"
 	)
 
 	// Defer teardown
-	defer func() {
-		_, err = LIVE.Exec(teardownSql, firstType)
-		CheckError(err)
-	}()
+	defer fakeTypeTeardown()
 
 	// Prepare test variables
-	result, err = LIVE.Exec(setupSql, firstType, firstType)
-	CheckError(err)
-	typeId, err = result.LastInsertId()
-	CheckError(err)
+	typeId = fakeTypeSetup()
 	expected = newPokemonType(typeId, firstType, firstType, firstType+"/"+firstType)
 	TYPES_DAO.Update(*expected)
 	err = LIVE.QueryRow(verifySql, typeId).Scan(&typeId, &firstType, &secondType, &displayName)
@@ -272,35 +252,22 @@ func TestTypesDao_Delete(t *testing.T) {
 	var (
 		firstType   = "Test"
 		typeId      int64
-		result      sql.Result
-		err         error
 		pokemonType *models.PokemonType
 		expected    int64 = 0
 		actual      int64
-		setupSql    = "INSERT INTO pvpgo.types (first_type, display_name) " +
-			"VALUES (?, ?)"
-		verifySql = "SELECT COUNT(*) " +
+		verifySql   = "SELECT COUNT(*) " +
 			"FROM pvpgo.types " +
-			"WHERE first_type = ?"
-		teardownSql = "DELETE FROM pvpgo.types " +
 			"WHERE first_type = ?"
 	)
 
 	// Defer teardown
-	defer func() {
-		_, err = LIVE.Exec(teardownSql, firstType)
-		CheckError(err)
-	}()
+	defer fakeTypeTeardown()
 
 	// Prepare test variables
-	result, err = LIVE.Exec(setupSql, firstType, firstType)
-	CheckError(err)
-	typeId, err = result.LastInsertId()
-	CheckError(err)
+	typeId = fakeTypeSetup()
 	pokemonType = newPokemonType(typeId, firstType, nil, firstType)
 	TYPES_DAO.Delete(*pokemonType)
-	err = LIVE.QueryRow(verifySql, firstType).Scan(&actual)
-	CheckError(err)
+	CheckError(LIVE.QueryRow(verifySql, firstType).Scan(&actual))
 
 	// Check expected vs actual
 	if !reflect.DeepEqual(expected, actual) {

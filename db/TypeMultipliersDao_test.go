@@ -20,17 +20,10 @@ func TestTypeMultipliersDao_FindSingleWhere(t *testing.T) {
 		actual           *models.TypeMultiplier
 		setupSql         = "INSERT INTO pvpgo.type_multipliers (receiving_type, acting_type, multiplier) " +
 			"VALUES (?, ?, ?)"
-		teardownSql = "DELETE FROM pvpgo.type_multipliers " +
-			"WHERE receiving_type = ? " +
-			"OR acting_type = ?"
 	)
 
 	// Defer teardown
-	defer func() {
-		_, err = LIVE.Exec(teardownSql, typeId, typeId)
-		fakeTypeTeardown()
-		CheckError(err)
-	}()
+	defer fakeTypeMultiplierTeardown()
 
 	// Test setup
 	typeId = fakeTypeSetup()
@@ -88,17 +81,10 @@ func TestTypeMultipliersDao_FindWhere(t *testing.T) {
 		actual            []models.TypeMultiplier
 		setupSql          = "INSERT INTO pvpgo.type_multipliers (receiving_type, acting_type, multiplier) " +
 			"VALUES (?, ?, ?)"
-		teardownSql = "DELETE FROM pvpgo.type_multipliers " +
-			"WHERE receiving_type = ? " +
-			"OR acting_type = ?"
 	)
 
 	// Defer teardown
-	defer func() {
-		_, err = LIVE.Exec(teardownSql, typeId, typeId)
-		fakeTypeTeardown()
-		CheckError(err)
-	}()
+	defer fakeTypeMultiplierTeardown()
 
 	// Test setup
 	typeId = fakeTypeSetup()
@@ -142,21 +128,15 @@ func TestTypeMultipliersDao_FindWhere(t *testing.T) {
 func TestTypeMultipliersDao_Create(t *testing.T) {
 	// Initialize test variables
 	var (
-		typeId      int64
-		multiplier  = 1.0
-		err         error
-		expected    *models.TypeMultiplier
-		actual      *models.TypeMultiplier
-		teardownSql = "DELETE FROM pvpgo.type_multipliers " +
-			"WHERE receiving_type = ?"
+		typeId     int64
+		multiplier = 1.0
+		err        error
+		expected   *models.TypeMultiplier
+		actual     *models.TypeMultiplier
 	)
 
 	// Defer teardown
-	defer func() {
-		_, err = LIVE.Exec(teardownSql, typeId)
-		fakeTypeTeardown()
-		CheckError(err)
-	}()
+	defer fakeTypeMultiplierTeardown()
 
 	// Prepare test variables
 	typeId = fakeTypeSetup()
@@ -178,32 +158,19 @@ func TestTypeMultipliersDao_Update(t *testing.T) {
 		receivingType    int64
 		actingType       int64
 		multiplier       float64
-		result           sql.Result
 		err              error
 		expected         *models.TypeMultiplier
 		actual           *models.TypeMultiplier
-		setupSql         = "INSERT INTO pvpgo.type_multipliers (receiving_type, acting_type, multiplier) " +
-			"VALUES (?, ?, ?)"
-		verifySql = "SELECT * " +
+		verifySql        = "SELECT * " +
 			"FROM pvpgo.type_multipliers " +
 			"WHERE id = ?"
-		teardownSql = "DELETE FROM pvpgo.type_multipliers " +
-			"WHERE receiving_type = ?"
 	)
 
 	// Defer teardown
-	defer func() {
-		_, err = LIVE.Exec(teardownSql, typeId)
-		fakeTypeTeardown()
-		CheckError(err)
-	}()
+	defer fakeTypeMultiplierTeardown()
 
 	// Prepare test variables
-	typeId = fakeTypeSetup()
-	result, err = LIVE.Exec(setupSql, typeId, typeId, 1.0)
-	CheckError(err)
-	typeMultiplierId, err = result.LastInsertId()
-	CheckError(err)
+	typeId, typeMultiplierId = fakeTypeMultiplierSetup()
 	expected = newTypeMultiplier(typeMultiplierId, typeId, typeId, 1.64)
 	TYPE_MULTIPLIER_DAO.Update(*expected)
 	err = LIVE.QueryRow(verifySql, typeMultiplierId).Scan(&typeMultiplierId, &receivingType, &actingType, &multiplier)
@@ -217,30 +184,29 @@ func TestTypeMultipliersDao_Update(t *testing.T) {
 }
 
 func TestTypeMultipliersDao_Delete(t *testing.T) {
-	// TODO: Finish Delete test
-}
-
-func fakeTypeSetup() int64 {
+	// Initialize test variables
 	var (
-		sqlStmt = "INSERT INTO pvpgo.types (first_type, display_name) " +
-			"VALUES ('Test', 'Test')"
-		id     int64
-		result sql.Result
-		err    error
+		typeId           int64
+		typeMultiplierId int64
+		typeMultiplier   *models.TypeMultiplier
+		expected         int64 = 0
+		actual           int64
+		verifySql        = "SELECT COUNT(*) " +
+			"FROM pvpgo.type_multipliers " +
+			"WHERE receiving_type = ?"
 	)
-	result, err = LIVE.Exec(sqlStmt)
-	CheckError(err)
-	id, err = result.LastInsertId()
-	CheckError(err)
-	return id
-}
 
-func fakeTypeTeardown() {
-	var (
-		sqlStmt = "DELETE FROM pvpgo.types " +
-			"WHERE first_type = 'Test'"
-		err error
-	)
-	_, err = LIVE.Exec(sqlStmt)
-	CheckError(err)
+	// Defer teardown
+	defer fakeTypeMultiplierTeardown()
+
+	// Prepare test variables
+	typeId, typeMultiplierId = fakeTypeMultiplierSetup()
+	typeMultiplier = newTypeMultiplier(typeMultiplierId, typeId, typeId, 1.0)
+	TYPE_MULTIPLIER_DAO.Delete(*typeMultiplier)
+	CheckError(LIVE.QueryRow(verifySql, typeId).Scan(&actual))
+
+	// Check expected vs actual
+	if expected != actual {
+		fail(t, "TypeMultipliersDao.Delete failed", expected, actual)
+	}
 }

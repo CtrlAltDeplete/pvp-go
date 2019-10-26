@@ -58,9 +58,9 @@ func (dao *PokemonDao) FindByName(name string) (error, *models.Pokemon) {
 	return dao.FindSingleWhere(query, name)
 }
 
-func (dao *PokemonDao) FindWhere(query string, params ...interface{}) *[]*models.Pokemon {
+func (dao *PokemonDao) FindWhere(query string, params ...interface{}) []models.Pokemon {
 	var (
-		pokemon                          = []*models.Pokemon{}
+		pokemon                          = []models.Pokemon{}
 		rows                             *sql.Rows
 		e                                error
 		id                               int64
@@ -80,29 +80,29 @@ func (dao *PokemonDao) FindWhere(query string, params ...interface{}) *[]*models
 	for rows.Next() {
 		CheckError(rows.Scan(&id, &gen, &name, &typeId, &atk, &def, &sta, &dateAdd, &legendary, &pvpEligible,
 			&optLevel, &optAtk, &optDef, &optSta))
-		pokemon = append(pokemon, newPokemon(id, gen, name, typeId, atk, def, sta, dateAdd, legendary, pvpEligible,
+		pokemon = append(pokemon, *newPokemon(id, gen, name, typeId, atk, def, sta, dateAdd, legendary, pvpEligible,
 			optLevel, optAtk, optDef, optSta))
 	}
 	CheckError(rows.Err())
 	CheckError(rows.Close())
-	return &pokemon
+	return pokemon
 }
 
-func (dao *PokemonDao) FindByGen(gen int64) *[]*models.Pokemon {
+func (dao *PokemonDao) FindByGen(gen int64) []models.Pokemon {
 	var (
 		query = "gen = ?"
 	)
 	return dao.FindWhere(query, gen)
 }
 
-func (dao *PokemonDao) FindByTypeId(id int64) *[]*models.Pokemon {
+func (dao *PokemonDao) FindByTypeId(id int64) []models.Pokemon {
 	var (
 		query = "type_id = ?"
 	)
 	return dao.FindWhere(query, id)
 }
 
-func (dao *PokemonDao) FindByTypeIds(ids []int64) *[]*models.Pokemon {
+func (dao *PokemonDao) FindByTypeIds(ids []int64) []models.Pokemon {
 	var (
 		id     int64
 		params []interface{}
@@ -114,31 +114,35 @@ func (dao *PokemonDao) FindByTypeIds(ids []int64) *[]*models.Pokemon {
 	return dao.FindWhere(query, params...)
 }
 
-func (dao *PokemonDao) FindAll() *[]*models.Pokemon {
+func (dao *PokemonDao) FindAll() []models.Pokemon {
 	return dao.FindWhere("TRUE")
 }
 
 func (dao *PokemonDao) Create(gen int64, name string, typeId int64, atk, def, sta float64, dateAdd string,
-	legendary, pvpEligible bool, optLevel, optAtk, optDef, optSta float64) *models.Pokemon {
+	legendary, pvpEligible bool, optLevel, optAtk, optDef, optSta float64) (error, *models.Pokemon) {
 	var (
 		result sql.Result
-		e      error
+		err    error
 		id     int64
 		query  = "INSERT INTO pvpgo.pokemon (gen, name, type_id, atk, def, sta, date_add, is_legendary, is_pvp_eligible, opt_level, opt_atk, opt_def, opt_sta) " +
 			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 	)
-	result, e = LIVE.Exec(query, gen, name, typeId, atk, def, sta, dateAdd, legendary, pvpEligible,
+	result, err = LIVE.Exec(query, gen, name, typeId, atk, def, sta, dateAdd, legendary, pvpEligible,
 		optLevel, optAtk, optDef, optSta)
-	CheckError(e)
-	id, e = result.LastInsertId()
-	CheckError(e)
-	return newPokemon(id, gen, name, typeId, atk, def, sta, dateAdd, legendary, pvpEligible, optLevel, optAtk,
+	if err != nil {
+		return err, nil
+	}
+	id, err = result.LastInsertId()
+	if err != nil {
+		return err, nil
+	}
+	return nil, newPokemon(id, gen, name, typeId, atk, def, sta, dateAdd, legendary, pvpEligible, optLevel, optAtk,
 		optDef, optSta)
 }
 
-func (dao *PokemonDao) Save(pokemon models.Pokemon) {
+func (dao *PokemonDao) Update(pokemon models.Pokemon) {
 	var (
-		e     error
+		err   error
 		query = "UPDATE pvpgo.pokemon " +
 			"SET gen = ?, " +
 			"name = ?, " +
@@ -155,36 +159,24 @@ func (dao *PokemonDao) Save(pokemon models.Pokemon) {
 			"opt_sta = ? " +
 			"WHERE id = ?"
 	)
-	_, e = LIVE.Exec(query, pokemon.Gen(), pokemon.Name(), pokemon.TypeId(), pokemon.Atk(), pokemon.Def(),
+	_, err = LIVE.Exec(query, pokemon.Gen(), pokemon.Name(), pokemon.TypeId(), pokemon.Atk(), pokemon.Def(),
 		pokemon.Sta(), pokemon.DateAdd(), pokemon.Legendary(), pokemon.PvpEligible(), pokemon.OptLevel(),
 		pokemon.OptAtk(), pokemon.OptDef(), pokemon.OptSta(), pokemon.Id())
-	CheckError(e)
+	CheckError(err)
 }
 
-func (dao *PokemonDao) Delete(pokemon *models.Pokemon) {
+func (dao *PokemonDao) Delete(pokemon models.Pokemon) {
 	var (
-		e     error
+		err   error
 		query = "DELETE FROM pvpgo.pokemon " +
 			"WHERE id = ?"
 	)
-	_, e = LIVE.Exec(query, pokemon.Id())
-	CheckError(e)
+	_, err = LIVE.Exec(query, pokemon.Id())
+	CheckError(err)
 }
 
-func (dao *PokemonDao) FindOrCreate(gen int64, name string, typeId int64, atk, def, sta float64,
-	dateAdd string, legendary, pvpEligible bool, optLevel, optAtk, optDef, optSta float64) *models.Pokemon {
-	var (
-		pokemon *models.Pokemon
-		err     error
-	)
-	err, pokemon = dao.FindByName(name)
-	if err != nil {
-		return dao.Create(gen, name, typeId, atk, def, sta, dateAdd, legendary, pvpEligible, optLevel, optAtk, optDef, optSta)
-	}
-	return pokemon
-}
-
-func newPokemon(id int64, gen int64, name string, typeId int64, atk float64, def float64, sta float64, dateAdd string, legendary bool, pvpEligible bool, optLevel float64, optAtk float64, optDef float64, optSta float64) *models.Pokemon {
+func newPokemon(id int64, gen int64, name string, typeId int64, atk float64, def float64, sta float64, dateAdd string,
+	legendary bool, pvpEligible bool, optLevel float64, optAtk float64, optDef float64, optSta float64) *models.Pokemon {
 	var p = models.Pokemon{}
 	p.SetId(id)
 	p.SetGen(gen)

@@ -7,24 +7,79 @@ import (
 
 type PokemonHasMoveDao struct{}
 
-func (dao *PokemonHasMoveDao) FindByPokemonAndMove(pokemonId, moveId int64) (error, *models.PokemonHasMove) {
+func (dao *PokemonHasMoveDao) FindSingleWhere(query string, params ...interface{}) (error, *models.PokemonHasMove) {
 	var (
-		id       int64
-		isLegacy bool
-		query    = "SELECT * " +
-			"FROM pvpgo.pokemon_has_move " +
-			"WHERE pokemon_id = ? " +
-			"AND move_id = ?"
-		err error
+		id        int64
+		pokemonId int64
+		moveId    int64
+		legacy    bool
+		rows      *sql.Rows
+		err       error
+		count     = 0
 	)
-	err = LIVE.QueryRow(query, pokemonId, moveId).Scan(&id, &pokemonId, &moveId, &isLegacy)
-	if err != nil {
-		return err, nil
+	query = "SELECT * " +
+		"FROM pvpgo.pokemon_has_move " +
+		"WHERE " + query
+	rows, err = LIVE.Query(query, params...)
+	CheckError(err)
+	for rows.Next() {
+		count++
+		CheckError(rows.Scan(&id, &pokemonId, &moveId, &legacy))
+		if count > 1 {
+			break
+		}
 	}
-	return nil, newPokemonHasMove(id, pokemonId, moveId, isLegacy)
+	CheckError(rows.Err())
+	CheckError(rows.Close())
+	if count == 0 {
+		return NO_ROWS, nil
+	} else if count == 1 {
+		return nil, newPokemonHasMove(id, pokemonId, moveId, legacy)
+	} else {
+		return MULTIPLE_ROWS, nil
+	}
 }
 
-func (dao *PokemonHasMoveDao) Create(pokemonId, moveId int64, isLegacy bool) *models.PokemonHasMove {
+func (dao *PokemonHasMoveDao) FindByPokemonAndMove(pokemonId, moveId int64) (error, *models.PokemonHasMove) {
+	var (
+		query = "pokemon_id = ? " +
+			"AND move_id = ?"
+	)
+	return dao.FindSingleWhere(query, pokemonId, moveId)
+}
+
+func (dao *PokemonHasMoveDao) FindWhere(query string, params ...interface{}) []models.PokemonHasMove {
+	var (
+		pokemonHasMoves = []models.PokemonHasMove{}
+		rows            *sql.Rows
+		err             error
+		id              int64
+		pokemonId       int64
+		moveId          int64
+		legacy          bool
+	)
+	query = "SELECT * " +
+		"FROM pvpgo.pokemon_has_move " +
+		"WHERE " + query
+	rows, err = LIVE.Query(query, params...)
+	CheckError(err)
+	for rows.Next() {
+		CheckError(rows.Scan(&id, &pokemonId, &moveId, &legacy))
+		pokemonHasMoves = append(pokemonHasMoves, *newPokemonHasMove(id, pokemonId, moveId, legacy))
+	}
+	CheckError(rows.Err())
+	CheckError(rows.Close())
+	return pokemonHasMoves
+}
+
+func (dao *PokemonHasMoveDao) FindAllByPokemonId(pokemonId int64) []models.PokemonHasMove {
+	var (
+		query = "pokemon_id = ?"
+	)
+	return dao.FindWhere(query, pokemonId)
+}
+
+func (dao *PokemonHasMoveDao) Create(pokemonId, moveId int64, isLegacy bool) (error, *models.PokemonHasMove) {
 	var (
 		result sql.Result
 		err    error
@@ -33,22 +88,37 @@ func (dao *PokemonHasMoveDao) Create(pokemonId, moveId int64, isLegacy bool) *mo
 			"VALUES (?, ?, ?)"
 	)
 	result, err = LIVE.Exec(query, pokemonId, moveId, isLegacy)
-	CheckError(err)
+	if err != nil {
+		return err, nil
+	}
 	id, err = result.LastInsertId()
-	CheckError(err)
-	return newPokemonHasMove(id, pokemonId, moveId, isLegacy)
+	if err != nil {
+		return err, nil
+	}
+	return nil, newPokemonHasMove(id, pokemonId, moveId, isLegacy)
 }
 
-func (dao *PokemonHasMoveDao) FindOrCreate(pokemonId, moveId int64, isLegacy bool) *models.PokemonHasMove {
+func (dao *PokemonHasMoveDao) Update(pokemonHasMove models.PokemonHasMove) {
 	var (
-		pokemonHasMove *models.PokemonHasMove
-		err            error
+		err   error
+		query = "UPDATE pvpgo.pokemon_has_move " +
+			"SET pokemon_id = ?, " +
+			"move_id = ?, " +
+			"is_legacy = ? " +
+			"WHERE id = ?"
 	)
-	err, pokemonHasMove = dao.FindByPokemonAndMove(pokemonId, moveId)
-	if err != nil {
-		return dao.Create(pokemonId, moveId, isLegacy)
-	}
-	return pokemonHasMove
+	_, err = LIVE.Exec(query, pokemonHasMove.PokemonId(), pokemonHasMove.MoveId(), pokemonHasMove.IsLegacy(), pokemonHasMove.Id())
+	CheckError(err)
+}
+
+func (dao *PokemonHasMoveDao) Delete(pokemonHasMove models.PokemonHasMove) {
+	var (
+		err   error
+		query = "DELETE FROM pvpgo.pokemon_has_move " +
+			"WHERE id = ?"
+	)
+	_, err = LIVE.Exec(query, pokemonHasMove.Id())
+	CheckError(err)
 }
 
 func newPokemonHasMove(id, pokemonId, moveId int64, isLegacy bool) *models.PokemonHasMove {

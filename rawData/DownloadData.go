@@ -48,7 +48,7 @@ func DownloadJsonFiles() {
 
 	if _, e = os.Stat(JSON_DIRECTORY); os.IsNotExist(e) {
 		e = os.MkdirAll(JSON_DIRECTORY, os.ModePerm)
-		checkError(e)
+		db.CheckError(e)
 	}
 
 	downloadFile(TYPE_CHART_JSON, JSON_DIRECTORY+"type_chart.json")
@@ -63,13 +63,13 @@ func downloadFile(url, path string) {
 		e    error
 	)
 	resp, e = http.Get(url)
-	checkError(e)
+	db.CheckError(e)
 	out, e = os.Create(path)
-	checkError(e)
+	db.CheckError(e)
 	_, e = io.Copy(out, resp.Body)
-	checkError(e)
-	checkError(resp.Body.Close())
-	checkError(out.Close())
+	db.CheckError(e)
+	db.CheckError(resp.Body.Close())
+	db.CheckError(out.Close())
 }
 
 type typeChartDto struct {
@@ -99,11 +99,11 @@ func ParseAllTypeCharts() {
 	var typesDao = db.TypesDao{}
 	var multiplierDao = db.TypeMultipliersDao{}
 	contents, e := ioutil.ReadFile(JSON_DIRECTORY + "type_chart.json")
-	checkError(e)
+	db.CheckError(e)
 
 	var typeChartDtos []typeChartDto
 	e = json.Unmarshal(contents, &typeChartDtos)
-	checkError(e)
+	db.CheckError(e)
 
 	baseTypes := []*models.PokemonType{}
 	for _, t := range BASE_TYPES {
@@ -182,14 +182,14 @@ func FillMoveDto(dto *moveDto, typeDao *db.TypesDao) {
 
 	if dto.MoveCategory == "Fast Move" {
 		dto.power, err = strconv.ParseInt(dto.PvpFastPower, 10, 64)
-		checkError(err)
+		db.CheckError(err)
 
 		dto.turns, err = strconv.ParseInt(dto.PvpFastDuration, 10, 64)
-		checkError(err)
+		db.CheckError(err)
 		dto.turns += 1
 
 		dto.energy, err = strconv.ParseInt(dto.PvpFastEnergy, 10, 64)
-		checkError(err)
+		db.CheckError(err)
 
 		dto.probability.Valid = false
 		dto.stageDelta.Valid = false
@@ -197,23 +197,23 @@ func FillMoveDto(dto *moveDto, typeDao *db.TypesDao) {
 		dto.target.Valid = false
 	} else if dto.MoveCategory == "Charge Move" {
 		dto.power, err = strconv.ParseInt(dto.PvpChargeDamage, 10, 64)
-		checkError(err)
+		db.CheckError(err)
 
 		dto.turns = 1
 
 		dto.energy, err = strconv.ParseInt(dto.PvpChargeEnergy, 10, 64)
-		checkError(err)
+		db.CheckError(err)
 
 		dto.probability.Valid = dto.Probability != ""
 		if dto.probability.Valid {
 			dto.probability.Float64, err = strconv.ParseFloat(dto.Probability, 64)
-			checkError(err)
+			db.CheckError(err)
 		}
 
 		dto.stageDelta.Valid = dto.StageDelta != ""
 		if dto.stageDelta.Valid {
 			dto.stageDelta.Int64, err = strconv.ParseInt(dto.StageDelta, 10, 64)
-			checkError(err)
+			db.CheckError(err)
 		}
 
 		dto.stats.String = dto.Stat
@@ -231,16 +231,29 @@ func ParseAllMoves() {
 	var typesDao = db.TypesDao{}
 	var movesDao = db.MovesDao{}
 	contents, e := ioutil.ReadFile(JSON_DIRECTORY + "moves.json")
-	checkError(e)
+	db.CheckError(e)
 
 	var moveDtos []moveDto
 	e = json.Unmarshal(contents, &moveDtos)
-	checkError(e)
+	db.CheckError(e)
 
 	for _, dto := range moveDtos {
 		FillMoveDto(&dto, &typesDao)
-		movesDao.FindOrCreate(dto.name, dto.typeId, dto.power, dto.turns, dto.energy, dto.probability, dto.stageDelta, dto.stats, dto.target)
-
+		err, move := movesDao.FindByName(dto.name)
+		if err == db.NO_ROWS {
+			err, move = movesDao.Create(dto.name, dto.typeId, dto.power, dto.turns, dto.energy, dto.probability,
+				dto.stageDelta, dto.stats, dto.target)
+		} else if err == nil {
+			move.SetTypeId(dto.typeId)
+			move.SetPower(float64(dto.power))
+			move.SetTurns(dto.turns)
+			move.SetEnergy(dto.energy)
+			move.SetProbability(dto.probability)
+			move.SetStageDelta(dto.stageDelta)
+			move.SetTarget(dto.target)
+			movesDao.Update(*move)
+		}
+		db.CheckError(err)
 	}
 }
 
@@ -301,13 +314,13 @@ func FillPokemonAndMovesetDto(dto *pokemonAndMovesetsDto, typeDao *db.TypesDao, 
 	dto.typeId = pokemonType.Id()
 
 	dto.atk, err = strconv.ParseFloat(dto.Atk, 64)
-	checkError(err)
+	db.CheckError(err)
 
 	dto.def, err = strconv.ParseFloat(dto.Def, 64)
-	checkError(err)
+	db.CheckError(err)
 
 	dto.sta, err = strconv.ParseFloat(dto.Sta, 64)
-	checkError(err)
+	db.CheckError(err)
 
 	r := regexp.MustCompile(`.*/pokemongo/files/(\d*)-(\d*).*`)
 	matches := r.FindAllStringSubmatch(dto.Uri, -1)[0]
@@ -413,11 +426,11 @@ func FillPokemonAndMovesetDto(dto *pokemonAndMovesetsDto, typeDao *db.TypesDao, 
 
 func ParseAllPokemonAndMovesets() {
 	contents, e := ioutil.ReadFile(JSON_DIRECTORY + "pokemon_and_movesets.json")
-	checkError(e)
+	db.CheckError(e)
 
 	var pokemonAndMovesetsDtos []pokemonAndMovesetsDto
 	e = json.Unmarshal(contents, &pokemonAndMovesetsDtos)
-	checkError(e)
+	db.CheckError(e)
 
 	var typeDao = db.TypesDao{}
 	var movesDao = db.MovesDao{}
@@ -431,20 +444,43 @@ func ParseAllPokemonAndMovesets() {
 			log.Printf("[%d/%d] %f%% complete.\n", i, len(pokemonAndMovesetsDtos), (100.0 * float64(i) / float64(len(pokemonAndMovesetsDtos))))
 			continue
 		}
-		pokemon = pokemonDao.FindOrCreate(dto.gen, dto.name, dto.typeId, dto.atk, dto.def, dto.sta, dto.dateAdd,
-			dto.isLegendary, dto.isPvpEligible, 0, 0, 0, 0)
+		err, pokemon = pokemonDao.FindByName(dto.name)
+		if err == db.NO_ROWS {
+			err, pokemon = pokemonDao.Create(dto.gen, dto.name, dto.typeId, dto.atk, dto.def, dto.sta, dto.dateAdd,
+				dto.isLegendary, dto.isPvpEligible, 0, 0, 0, 0)
+		} else if err == nil {
+			pokemon.SetGen(dto.gen)
+			pokemon.SetTypeId(dto.typeId)
+			pokemon.SetAtk(dto.atk)
+			pokemon.SetDef(dto.def)
+			pokemon.SetSta(dto.sta)
+			pokemon.SetDateAdd(dto.dateAdd)
+			pokemon.SetLegendary(dto.isLegendary)
+			pokemon.SetPvpEligible(dto.isPvpEligible)
+			pokemonDao.Update(*pokemon)
+		}
+		db.CheckError(err)
+
 		for moveId, isMoveLegacy := range dto.fastMoveIdAndIsLegacy {
-			_ = pokemonHasMoveDao.FindOrCreate(pokemon.Id(), moveId, isMoveLegacy)
+			err, pokemonHasMove := pokemonHasMoveDao.FindByPokemonAndMove(pokemon.Id(), moveId)
+			if err == db.NO_ROWS {
+				err, pokemonHasMove = pokemonHasMoveDao.Create(pokemon.Id(), moveId, isMoveLegacy)
+			} else if err == nil {
+				pokemonHasMove.SetIsLegacy(isMoveLegacy)
+				pokemonHasMoveDao.Update(*pokemonHasMove)
+			}
+			db.CheckError(err)
 		}
 		for moveId, isMoveLegacy := range dto.chargeMoveIdAndIsLegacy {
-			_ = pokemonHasMoveDao.FindOrCreate(pokemon.Id(), moveId, isMoveLegacy)
+			err, pokemonHasMove := pokemonHasMoveDao.FindByPokemonAndMove(pokemon.Id(), moveId)
+			if err == db.NO_ROWS {
+				err, pokemonHasMove = pokemonHasMoveDao.Create(pokemon.Id(), moveId, isMoveLegacy)
+			} else if err == nil {
+				pokemonHasMove.SetIsLegacy(isMoveLegacy)
+				pokemonHasMoveDao.Update(*pokemonHasMove)
+			}
+			db.CheckError(err)
 		}
 		log.Printf("[%d/%d] %f%% complete.\n", i, len(pokemonAndMovesetsDtos), (100.0 * float64(i) / float64(len(pokemonAndMovesetsDtos))))
-	}
-}
-
-func checkError(e error) {
-	if e != nil {
-		panic(e)
 	}
 }
