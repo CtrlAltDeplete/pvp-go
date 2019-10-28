@@ -143,6 +143,32 @@ func (dao *MovesDao) Update(move models.Move) {
 	CheckError(e)
 }
 
+func (dao *MovesDao) Upsert(name string, typeId, power, turns, energy int64, probability, stageDelta, stats,
+	target interface{}) (error, *models.Move) {
+	var (
+		err  error
+		move *models.Move
+	)
+	err, move = dao.FindByName(name)
+	if err == NO_ROWS {
+		err, move = dao.Create(name, typeId, power, turns, energy, probability, stageDelta, stats, target)
+	} else if err == nil {
+		move.SetTypeId(typeId)
+		move.SetPower(float64(power))
+		move.SetTurns(turns)
+		move.SetEnergy(energy)
+		move.SetProbability(probability)
+		move.SetStageDelta(stageDelta)
+		move.SetStats(stats)
+		move.SetTarget(target)
+		dao.Update(*move)
+	}
+	if err != nil {
+		return err, nil
+	}
+	return nil, move
+}
+
 func (dao *MovesDao) Delete(move models.Move) {
 	var (
 		e     error

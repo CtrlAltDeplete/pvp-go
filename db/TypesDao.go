@@ -174,26 +174,54 @@ func (dao *TypesDao) Create(firstType string, secondType interface{}) (error, *m
 
 func (dao *TypesDao) Update(pokemonType models.PokemonType) {
 	var (
-		e     error
+		err   error
 		query = "UPDATE pvpgo.types " +
 			"SET first_type = ?, " +
 			"second_type = ?, " +
 			"display_name = ? " +
 			"WHERE id = ?"
 	)
-	_, e = LIVE.Exec(query, pokemonType.FirstType(), pokemonType.SecondTypeNullable(), pokemonType.DisplayName(),
+	_, err = LIVE.Exec(query, pokemonType.FirstType(), pokemonType.SecondTypeNullable(), pokemonType.DisplayName(),
 		pokemonType.Id())
-	CheckError(e)
+	CheckError(err)
+}
+
+func (dao *TypesDao) Upsert(firstType string, secondType interface{}) (error, *models.PokemonType) {
+	var (
+		err         error
+		pokemonType *models.PokemonType
+		types       = []string{firstType}
+	)
+	switch st := secondType.(type) {
+	case string:
+		types = append(types, st)
+	case sql.NullString:
+		if st.Valid {
+			return dao.Upsert(firstType, st.String)
+		}
+	}
+	err, pokemonType = dao.FindSingleByTypes(types)
+	if err == NO_ROWS {
+		err, pokemonType = dao.Create(firstType, secondType)
+	} else if err == nil {
+		pokemonType.SetFirstType(firstType)
+		pokemonType.SetSecondType(secondType)
+		dao.Update(*pokemonType)
+	}
+	if err != nil {
+		return err, nil
+	}
+	return nil, pokemonType
 }
 
 func (dao *TypesDao) Delete(pokemonType models.PokemonType) {
 	var (
-		e     error
+		err   error
 		query = "DELETE FROM pvpgo.types " +
 			"WHERE id = ?"
 	)
-	_, e = LIVE.Exec(query, pokemonType.Id())
-	CheckError(e)
+	_, err = LIVE.Exec(query, pokemonType.Id())
+	CheckError(err)
 }
 
 func newPokemonType(id int64, firstType string, secondType interface{}, displayName string) *models.PokemonType {

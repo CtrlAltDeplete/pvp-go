@@ -165,6 +165,37 @@ func (dao *PokemonDao) Update(pokemon models.Pokemon) {
 	CheckError(err)
 }
 
+func (dao *PokemonDao) Upsert(gen int64, name string, typeId int64, atk, def, sta float64, dateAdd string,
+	legendary, pvpEligible bool, optLevel, optAtk, optDef, optSta float64) (error, *models.Pokemon) {
+	var (
+		err     error
+		pokemon *models.Pokemon
+	)
+	err, pokemon = dao.FindByName(name)
+	if err == NO_ROWS {
+		err, pokemon = dao.Create(gen, name, typeId, atk, def, sta, dateAdd, legendary, pvpEligible, optLevel,
+			optAtk, optDef, optSta)
+	} else if err == nil {
+		pokemon.SetGen(gen)
+		pokemon.SetTypeId(typeId)
+		pokemon.SetAtk(atk)
+		pokemon.SetDef(def)
+		pokemon.SetSta(sta)
+		pokemon.SetDateAdd(dateAdd)
+		pokemon.SetLegendary(legendary)
+		pokemon.SetPvpEligible(pvpEligible)
+		pokemon.SetOptLevel(optLevel)
+		pokemon.SetOptAtk(optAtk)
+		pokemon.SetOptDef(optDef)
+		pokemon.SetOptSta(sta)
+		dao.Update(*pokemon)
+	}
+	if err != nil {
+		return err, nil
+	}
+	return nil, pokemon
+}
+
 func (dao *PokemonDao) Delete(pokemon models.Pokemon) {
 	var (
 		err   error

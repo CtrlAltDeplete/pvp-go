@@ -119,6 +119,24 @@ func (dao *TypeMultipliersDao) Update(typeMultiplier models.TypeMultiplier) {
 	CheckError(err)
 }
 
+func (dao *TypeMultipliersDao) Upsert(receivingType, actingType int64, multiplier float64) (error, *models.TypeMultiplier) {
+	var (
+		err            error
+		typeMultiplier *models.TypeMultiplier
+	)
+	err, typeMultiplier = dao.FindByIds(receivingType, actingType)
+	if err == NO_ROWS {
+		err, typeMultiplier = dao.Create(receivingType, actingType, multiplier)
+	} else if err == nil {
+		typeMultiplier.SetMultiplier(multiplier)
+		dao.Update(*typeMultiplier)
+	}
+	if err != nil {
+		return err, nil
+	}
+	return nil, typeMultiplier
+}
+
 func (dao *TypeMultipliersDao) Delete(typeMultiplier models.TypeMultiplier) {
 	var (
 		err   error

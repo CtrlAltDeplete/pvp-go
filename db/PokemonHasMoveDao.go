@@ -111,6 +111,24 @@ func (dao *PokemonHasMoveDao) Update(pokemonHasMove models.PokemonHasMove) {
 	CheckError(err)
 }
 
+func (dao *PokemonHasMoveDao) Upsert(pokemonId, moveId int64, isLegacy bool) (error, *models.PokemonHasMove) {
+	var (
+		err            error
+		pokemonHasMove *models.PokemonHasMove
+	)
+	err, pokemonHasMove = dao.FindByPokemonAndMove(pokemonId, moveId)
+	if err == NO_ROWS {
+		err, pokemonHasMove = dao.Create(pokemonId, moveId, isLegacy)
+	} else if err == nil {
+		pokemonHasMove.SetIsLegacy(isLegacy)
+		dao.Update(*pokemonHasMove)
+	}
+	if err != nil {
+		return err, nil
+	}
+	return nil, pokemonHasMove
+}
+
 func (dao *PokemonHasMoveDao) Delete(pokemonHasMove models.PokemonHasMove) {
 	var (
 		err   error
