@@ -1,14 +1,14 @@
-package db
+package daos
 
 import (
-	"PvP-Go/models"
+	"PvP-Go/db/dtos"
 	"database/sql"
 	"strings"
 )
 
 type TypesDao struct{}
 
-func (dao *TypesDao) FindSingleWhere(query string, params ...interface{}) (error, *models.PokemonType) {
+func (dao *TypesDao) FindSingleWhere(query string, params ...interface{}) (error, *dtos.TypeDto) {
 	var (
 		id          int64
 		firstType   string
@@ -41,14 +41,14 @@ func (dao *TypesDao) FindSingleWhere(query string, params ...interface{}) (error
 	}
 }
 
-func (dao *TypesDao) FindById(id int64) (error, *models.PokemonType) {
+func (dao *TypesDao) FindById(id int64) (error, *dtos.TypeDto) {
 	var (
 		query = "id = ?"
 	)
 	return dao.FindSingleWhere(query, id)
 }
 
-func (dao *TypesDao) FindSingleByType(t string) (error, *models.PokemonType) {
+func (dao *TypesDao) FindSingleByType(t string) (error, *dtos.TypeDto) {
 	var (
 		query = "first_type = ? " +
 			"AND second_type IS NULL"
@@ -56,7 +56,7 @@ func (dao *TypesDao) FindSingleByType(t string) (error, *models.PokemonType) {
 	return dao.FindSingleWhere(query, t)
 }
 
-func (dao *TypesDao) FindSingleByTypes(t []string) (error, *models.PokemonType) {
+func (dao *TypesDao) FindSingleByTypes(t []string) (error, *dtos.TypeDto) {
 	if len(t) == 1 {
 		return dao.FindSingleByType(t[0])
 	} else if len(t) == 2 {
@@ -69,9 +69,9 @@ func (dao *TypesDao) FindSingleByTypes(t []string) (error, *models.PokemonType) 
 	}
 }
 
-func (dao *TypesDao) FindWhere(query string, params ...interface{}) []models.PokemonType {
+func (dao *TypesDao) FindWhere(query string, params ...interface{}) []dtos.TypeDto {
 	var (
-		pokemonTypes = []models.PokemonType{}
+		pokemonTypes = []dtos.TypeDto{}
 		rows         *sql.Rows
 		err          error
 		id           int64
@@ -93,7 +93,7 @@ func (dao *TypesDao) FindWhere(query string, params ...interface{}) []models.Pok
 	return pokemonTypes
 }
 
-func (dao *TypesDao) FindAllByType(t string) []models.PokemonType {
+func (dao *TypesDao) FindAllByType(t string) []dtos.TypeDto {
 	var (
 		query = "first_type = ? " +
 			"OR second_type = ?"
@@ -101,7 +101,7 @@ func (dao *TypesDao) FindAllByType(t string) []models.PokemonType {
 	return dao.FindWhere(query, t, t)
 }
 
-func (dao *TypesDao) FindAllByTypes(t []string) []models.PokemonType {
+func (dao *TypesDao) FindAllByTypes(t []string) []dtos.TypeDto {
 	var (
 		params []interface{}
 		query  = "first_type IN (?" + strings.Repeat(", ?", len(t)-1) + ") " +
@@ -115,9 +115,9 @@ func (dao *TypesDao) FindAllByTypes(t []string) []models.PokemonType {
 	return dao.FindWhere(query, params...)
 }
 
-func (dao *TypesDao) FindAll() []models.PokemonType {
+func (dao *TypesDao) FindAll() []dtos.TypeDto {
 	var (
-		pokemonTypes = []models.PokemonType{}
+		pokemonTypes = []dtos.TypeDto{}
 		rows         *sql.Rows
 		e            error
 		id           int64
@@ -137,7 +137,7 @@ func (dao *TypesDao) FindAll() []models.PokemonType {
 	return pokemonTypes
 }
 
-func (dao *TypesDao) Create(firstType string, secondType interface{}) (error, *models.PokemonType) {
+func (dao *TypesDao) Create(firstType string, secondType interface{}) (error, *dtos.TypeDto) {
 	var (
 		displayName string
 		result      sql.Result
@@ -172,7 +172,7 @@ func (dao *TypesDao) Create(firstType string, secondType interface{}) (error, *m
 	return nil, newPokemonType(id, firstType, secondType, displayName)
 }
 
-func (dao *TypesDao) Update(pokemonType models.PokemonType) {
+func (dao *TypesDao) Update(pokemonType dtos.TypeDto) {
 	var (
 		err   error
 		query = "UPDATE pvpgo.types " +
@@ -186,10 +186,10 @@ func (dao *TypesDao) Update(pokemonType models.PokemonType) {
 	CheckError(err)
 }
 
-func (dao *TypesDao) Upsert(firstType string, secondType interface{}) (error, *models.PokemonType) {
+func (dao *TypesDao) Upsert(firstType string, secondType interface{}) (error, *dtos.TypeDto) {
 	var (
 		err         error
-		pokemonType *models.PokemonType
+		pokemonType *dtos.TypeDto
 		types       = []string{firstType}
 	)
 	switch st := secondType.(type) {
@@ -214,7 +214,7 @@ func (dao *TypesDao) Upsert(firstType string, secondType interface{}) (error, *m
 	return nil, pokemonType
 }
 
-func (dao *TypesDao) Delete(pokemonType models.PokemonType) {
+func (dao *TypesDao) Delete(pokemonType dtos.TypeDto) {
 	var (
 		err   error
 		query = "DELETE FROM pvpgo.types " +
@@ -224,8 +224,8 @@ func (dao *TypesDao) Delete(pokemonType models.PokemonType) {
 	CheckError(err)
 }
 
-func newPokemonType(id int64, firstType string, secondType interface{}, displayName string) *models.PokemonType {
-	var pt = models.PokemonType{}
+func newPokemonType(id int64, firstType string, secondType interface{}, displayName string) *dtos.TypeDto {
+	var pt = dtos.TypeDto{}
 	pt.SetId(id)
 	pt.SetFirstType(firstType)
 	pt.SetSecondType(secondType)

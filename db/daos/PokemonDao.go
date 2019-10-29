@@ -1,14 +1,14 @@
-package db
+package daos
 
 import (
-	"PvP-Go/models"
+	"PvP-Go/db/dtos"
 	"database/sql"
 	"strings"
 )
 
 type PokemonDao struct{}
 
-func (dao *PokemonDao) FindSingleWhere(query string, params ...interface{}) (error, *models.Pokemon) {
+func (dao *PokemonDao) FindSingleWhere(query string, params ...interface{}) (error, *dtos.PokemonDto) {
 	var (
 		id                               int64
 		gen                              int64
@@ -44,23 +44,23 @@ func (dao *PokemonDao) FindSingleWhere(query string, params ...interface{}) (err
 	}
 }
 
-func (dao *PokemonDao) FindById(id int64) (error, *models.Pokemon) {
+func (dao *PokemonDao) FindById(id int64) (error, *dtos.PokemonDto) {
 	var (
 		query = "id = ?"
 	)
 	return dao.FindSingleWhere(query, id)
 }
 
-func (dao *PokemonDao) FindByName(name string) (error, *models.Pokemon) {
+func (dao *PokemonDao) FindByName(name string) (error, *dtos.PokemonDto) {
 	var (
 		query = "name = ?"
 	)
 	return dao.FindSingleWhere(query, name)
 }
 
-func (dao *PokemonDao) FindWhere(query string, params ...interface{}) []models.Pokemon {
+func (dao *PokemonDao) FindWhere(query string, params ...interface{}) []dtos.PokemonDto {
 	var (
-		pokemon                          = []models.Pokemon{}
+		pokemon                          = []dtos.PokemonDto{}
 		rows                             *sql.Rows
 		e                                error
 		id                               int64
@@ -88,21 +88,21 @@ func (dao *PokemonDao) FindWhere(query string, params ...interface{}) []models.P
 	return pokemon
 }
 
-func (dao *PokemonDao) FindByGen(gen int64) []models.Pokemon {
+func (dao *PokemonDao) FindByGen(gen int64) []dtos.PokemonDto {
 	var (
 		query = "gen = ?"
 	)
 	return dao.FindWhere(query, gen)
 }
 
-func (dao *PokemonDao) FindByTypeId(id int64) []models.Pokemon {
+func (dao *PokemonDao) FindByTypeId(id int64) []dtos.PokemonDto {
 	var (
 		query = "type_id = ?"
 	)
 	return dao.FindWhere(query, id)
 }
 
-func (dao *PokemonDao) FindByTypeIds(ids []int64) []models.Pokemon {
+func (dao *PokemonDao) FindByTypeIds(ids []int64) []dtos.PokemonDto {
 	var (
 		id     int64
 		params []interface{}
@@ -114,12 +114,12 @@ func (dao *PokemonDao) FindByTypeIds(ids []int64) []models.Pokemon {
 	return dao.FindWhere(query, params...)
 }
 
-func (dao *PokemonDao) FindAll() []models.Pokemon {
+func (dao *PokemonDao) FindAll() []dtos.PokemonDto {
 	return dao.FindWhere("TRUE")
 }
 
 func (dao *PokemonDao) Create(gen int64, name string, typeId int64, atk, def, sta float64, dateAdd string,
-	legendary, pvpEligible bool, optLevel, optAtk, optDef, optSta float64) (error, *models.Pokemon) {
+	legendary, pvpEligible bool, optLevel, optAtk, optDef, optSta float64) (error, *dtos.PokemonDto) {
 	var (
 		result sql.Result
 		err    error
@@ -140,7 +140,7 @@ func (dao *PokemonDao) Create(gen int64, name string, typeId int64, atk, def, st
 		optDef, optSta)
 }
 
-func (dao *PokemonDao) Update(pokemon models.Pokemon) {
+func (dao *PokemonDao) Update(pokemon dtos.PokemonDto) {
 	var (
 		err   error
 		query = "UPDATE pvpgo.pokemon " +
@@ -166,10 +166,10 @@ func (dao *PokemonDao) Update(pokemon models.Pokemon) {
 }
 
 func (dao *PokemonDao) Upsert(gen int64, name string, typeId int64, atk, def, sta float64, dateAdd string,
-	legendary, pvpEligible bool, optLevel, optAtk, optDef, optSta float64) (error, *models.Pokemon) {
+	legendary, pvpEligible bool, optLevel, optAtk, optDef, optSta float64) (error, *dtos.PokemonDto) {
 	var (
 		err     error
-		pokemon *models.Pokemon
+		pokemon *dtos.PokemonDto
 	)
 	err, pokemon = dao.FindByName(name)
 	if err == NO_ROWS {
@@ -196,7 +196,7 @@ func (dao *PokemonDao) Upsert(gen int64, name string, typeId int64, atk, def, st
 	return nil, pokemon
 }
 
-func (dao *PokemonDao) Delete(pokemon models.Pokemon) {
+func (dao *PokemonDao) Delete(pokemon dtos.PokemonDto) {
 	var (
 		err   error
 		query = "DELETE FROM pvpgo.pokemon " +
@@ -207,8 +207,8 @@ func (dao *PokemonDao) Delete(pokemon models.Pokemon) {
 }
 
 func newPokemon(id int64, gen int64, name string, typeId int64, atk float64, def float64, sta float64, dateAdd string,
-	legendary bool, pvpEligible bool, optLevel float64, optAtk float64, optDef float64, optSta float64) *models.Pokemon {
-	var p = models.Pokemon{}
+	legendary bool, pvpEligible bool, optLevel float64, optAtk float64, optDef float64, optSta float64) *dtos.PokemonDto {
+	var p = dtos.PokemonDto{}
 	p.SetId(id)
 	p.SetGen(gen)
 	p.SetName(name)

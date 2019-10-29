@@ -1,13 +1,13 @@
-package db
+package daos
 
 import (
-	"PvP-Go/models"
+	"PvP-Go/db/dtos"
 	"database/sql"
 )
 
 type TypeMultipliersDao struct{}
 
-func (dao *TypeMultipliersDao) FindSingleWhere(query string, params ...interface{}) (error, *models.TypeMultiplier) {
+func (dao *TypeMultipliersDao) FindSingleWhere(query string, params ...interface{}) (error, *dtos.TypeMultiplierDto) {
 	var (
 		id            int64
 		receivingType int64
@@ -40,7 +40,7 @@ func (dao *TypeMultipliersDao) FindSingleWhere(query string, params ...interface
 	}
 }
 
-func (dao *TypeMultipliersDao) FindByIds(receivingType, actingType int64) (error, *models.TypeMultiplier) {
+func (dao *TypeMultipliersDao) FindByIds(receivingType, actingType int64) (error, *dtos.TypeMultiplierDto) {
 	var (
 		query = "receiving_type = ? " +
 			"AND acting_type = ?"
@@ -48,9 +48,9 @@ func (dao *TypeMultipliersDao) FindByIds(receivingType, actingType int64) (error
 	return dao.FindSingleWhere(query, receivingType, actingType)
 }
 
-func (dao *TypeMultipliersDao) FindWhere(query string, params ...interface{}) []models.TypeMultiplier {
+func (dao *TypeMultipliersDao) FindWhere(query string, params ...interface{}) []dtos.TypeMultiplierDto {
 	var (
-		typeMultipliers = []models.TypeMultiplier{}
+		typeMultipliers = []dtos.TypeMultiplierDto{}
 		rows            *sql.Rows
 		err             error
 		id              int64
@@ -72,21 +72,21 @@ func (dao *TypeMultipliersDao) FindWhere(query string, params ...interface{}) []
 	return typeMultipliers
 }
 
-func (dao *TypeMultipliersDao) FindAllByReceivingType(receivingType int64) []models.TypeMultiplier {
+func (dao *TypeMultipliersDao) FindAllByReceivingType(receivingType int64) []dtos.TypeMultiplierDto {
 	var (
 		query = "receiving_type = ?"
 	)
 	return dao.FindWhere(query, receivingType)
 }
 
-func (dao *TypeMultipliersDao) FindAllByActingType(actingType int64) []models.TypeMultiplier {
+func (dao *TypeMultipliersDao) FindAllByActingType(actingType int64) []dtos.TypeMultiplierDto {
 	var (
 		query = "acting_type = ?"
 	)
 	return dao.FindWhere(query, actingType)
 }
 
-func (dao *TypeMultipliersDao) Create(receivingType, actingType int64, multiplier float64) (error, *models.TypeMultiplier) {
+func (dao *TypeMultipliersDao) Create(receivingType, actingType int64, multiplier float64) (error, *dtos.TypeMultiplierDto) {
 	var (
 		result sql.Result
 		err    error
@@ -105,7 +105,7 @@ func (dao *TypeMultipliersDao) Create(receivingType, actingType int64, multiplie
 	return nil, newTypeMultiplier(id, receivingType, actingType, multiplier)
 }
 
-func (dao *TypeMultipliersDao) Update(typeMultiplier models.TypeMultiplier) {
+func (dao *TypeMultipliersDao) Update(typeMultiplier dtos.TypeMultiplierDto) {
 	var (
 		err   error
 		query = "UPDATE pvpgo.type_multipliers " +
@@ -119,10 +119,10 @@ func (dao *TypeMultipliersDao) Update(typeMultiplier models.TypeMultiplier) {
 	CheckError(err)
 }
 
-func (dao *TypeMultipliersDao) Upsert(receivingType, actingType int64, multiplier float64) (error, *models.TypeMultiplier) {
+func (dao *TypeMultipliersDao) Upsert(receivingType, actingType int64, multiplier float64) (error, *dtos.TypeMultiplierDto) {
 	var (
 		err            error
-		typeMultiplier *models.TypeMultiplier
+		typeMultiplier *dtos.TypeMultiplierDto
 	)
 	err, typeMultiplier = dao.FindByIds(receivingType, actingType)
 	if err == NO_ROWS {
@@ -137,7 +137,7 @@ func (dao *TypeMultipliersDao) Upsert(receivingType, actingType int64, multiplie
 	return nil, typeMultiplier
 }
 
-func (dao *TypeMultipliersDao) Delete(typeMultiplier models.TypeMultiplier) {
+func (dao *TypeMultipliersDao) Delete(typeMultiplier dtos.TypeMultiplierDto) {
 	var (
 		err   error
 		query = "DELETE FROM pvpgo.type_multipliers " +
@@ -147,8 +147,8 @@ func (dao *TypeMultipliersDao) Delete(typeMultiplier models.TypeMultiplier) {
 	CheckError(err)
 }
 
-func newTypeMultiplier(id int64, receivingType int64, actingType int64, multiplier float64) *models.TypeMultiplier {
-	var tm = models.TypeMultiplier{}
+func newTypeMultiplier(id int64, receivingType int64, actingType int64, multiplier float64) *dtos.TypeMultiplierDto {
+	var tm = dtos.TypeMultiplierDto{}
 	tm.SetId(id)
 	tm.SetReceivingType(receivingType)
 	tm.SetActingType(actingType)

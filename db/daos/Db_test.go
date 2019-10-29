@@ -1,4 +1,4 @@
-package db
+package daos
 
 import (
 	"database/sql"
@@ -61,6 +61,31 @@ func fakeTypeMultiplierTeardown() {
 		err error
 	)
 	defer fakeTypeTeardown()
+	_, err = LIVE.Exec(sqlStmt)
+	CheckError(err)
+}
+
+func fakeCpMultiplierSetup() int64 {
+	var (
+		sqlStmt = "INSERT INTO pvpgo.cp_multipliers (level, multiplier) " +
+			"VALUES (?, ?)"
+		id     int64
+		result sql.Result
+		err    error
+	)
+	result, err = LIVE.Exec(sqlStmt, 0.0, 1.0)
+	CheckError(err)
+	id, err = result.LastInsertId()
+	CheckError(err)
+	return id
+}
+
+func fakeCpMultiplierTeardown() {
+	var (
+		sqlStmt = "DELETE FROM pvpgo.cp_multipliers " +
+			"WHERE level < 0.9"
+		err error
+	)
 	_, err = LIVE.Exec(sqlStmt)
 	CheckError(err)
 }

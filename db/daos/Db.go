@@ -1,4 +1,4 @@
-package db
+package daos
 
 import (
 	"database/sql"
@@ -16,6 +16,7 @@ var (
 	NO_ROWS              = errors.New("No rows found.")
 	MULTIPLE_ROWS        = errors.New("Multiple rows found.")
 	BAD_PARAMS           = errors.New("Bad parameters for DAO.")
+	CP_DAO               = CpDao{}
 	MOVES_DAO            = MovesDao{}
 	POKEMON_DAO          = PokemonDao{}
 	POKEMON_HAS_MOVE_DAO = PokemonHasMoveDao{}

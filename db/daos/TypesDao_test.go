@@ -1,7 +1,7 @@
-package db
+package daos
 
 import (
-	"PvP-Go/models"
+	"PvP-Go/db/dtos"
 	"database/sql"
 	"reflect"
 	"testing"
@@ -15,8 +15,8 @@ func TestTypesDao_FindSingleWhere(t *testing.T) {
 		typeNames = []string{"Test1", "Test2"}
 		result    sql.Result
 		err       error
-		expected  *models.PokemonType
-		actual    *models.PokemonType
+		expected  *dtos.TypeDto
+		actual    *dtos.TypeDto
 		setupSql  = "INSERT INTO pvpgo.types (first_type, display_name) " +
 			"VALUES (?, ?)"
 		teardownSql = "DELETE FROM pvpgo.types " +
@@ -80,8 +80,8 @@ func TestTypesDao_FindWhere(t *testing.T) {
 		typeNames = []string{"Test1", "Test2"}
 		result    sql.Result
 		err       error
-		expected  []models.PokemonType
-		actual    []models.PokemonType
+		expected  []dtos.TypeDto
+		actual    []dtos.TypeDto
 		setupSql  = "INSERT INTO pvpgo.types (first_type, display_name) " +
 			"VALUES (?, ?)"
 		teardownSql = "DELETE FROM pvpgo.types " +
@@ -109,7 +109,7 @@ func TestTypesDao_FindWhere(t *testing.T) {
 	/* No Results Test */
 	// Prepare test variables
 	query = "id <= ?"
-	expected = []models.PokemonType{}
+	expected = []dtos.TypeDto{}
 	actual = TYPES_DAO.FindWhere(query, 0)
 
 	// Check expected vs actual
@@ -120,7 +120,7 @@ func TestTypesDao_FindWhere(t *testing.T) {
 	/* Multiple Results Test */
 	// Prepare test variables
 	query = "id IN (?, ?)"
-	expected = []models.PokemonType{
+	expected = []dtos.TypeDto{
 		*newPokemonType(typeIds[0], typeNames[0], nil, typeNames[0]),
 		*newPokemonType(typeIds[1], typeNames[1], nil, typeNames[1]),
 	}
@@ -138,8 +138,8 @@ func TestTypesDao_Create(t *testing.T) {
 		firstType  = "Test"
 		secondType sql.NullString
 		err        error
-		expected   *models.PokemonType
-		actual     *models.PokemonType
+		expected   *dtos.TypeDto
+		actual     *dtos.TypeDto
 	)
 
 	// Defer teardown
@@ -223,8 +223,8 @@ func TestTypesDao_Update(t *testing.T) {
 		displayName string
 		typeId      int64
 		err         error
-		expected    *models.PokemonType
-		actual      *models.PokemonType
+		expected    *dtos.TypeDto
+		actual      *dtos.TypeDto
 		verifySql   = "SELECT id, first_type, second_type, display_name " +
 			"FROM pvpgo.types " +
 			"WHERE id = ?"
@@ -252,7 +252,7 @@ func TestTypesDao_Delete(t *testing.T) {
 	var (
 		firstType   = "Test"
 		typeId      int64
-		pokemonType *models.PokemonType
+		pokemonType *dtos.TypeDto
 		expected    int64 = 0
 		actual      int64
 		verifySql   = "SELECT COUNT(*) " +

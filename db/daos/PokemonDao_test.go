@@ -1,7 +1,7 @@
-package db
+package daos
 
 import (
-	"PvP-Go/models"
+	"PvP-Go/db/dtos"
 	"database/sql"
 	"fmt"
 	"reflect"
@@ -16,8 +16,8 @@ func TestPokemonDao_FindSingleWhere(t *testing.T) {
 		pokemonId int64
 		result    sql.Result
 		err       error
-		expected  *models.Pokemon
-		actual    *models.Pokemon
+		expected  *dtos.PokemonDto
+		actual    *dtos.PokemonDto
 		setupSql  = "INSERT INTO pvpgo.pokemon (gen, name, type_id, atk, def, sta) " +
 			"VALUES (0, ?, ?, 0, 0, 0)"
 	)
@@ -79,8 +79,8 @@ func TestPokemonDao_FindWhere(t *testing.T) {
 		pokemonIds []int64
 		result     sql.Result
 		err        error
-		expected   []models.Pokemon
-		actual     []models.Pokemon
+		expected   []dtos.PokemonDto
+		actual     []dtos.PokemonDto
 		setupSql   = "INSERT INTO pvpgo.pokemon (gen, name, type_id, atk, def, sta) " +
 			"VALUES (0, ?, ?, 0, 0, 0)"
 	)
@@ -102,7 +102,7 @@ func TestPokemonDao_FindWhere(t *testing.T) {
 	/* No Results Test */
 	// Prepare test variables
 	query = "id <= ?"
-	expected = []models.Pokemon{}
+	expected = []dtos.PokemonDto{}
 	actual = POKEMON_DAO.FindWhere(query, 0)
 
 	// Check expected vs actual
@@ -116,7 +116,7 @@ func TestPokemonDao_FindWhere(t *testing.T) {
 		panic("Expected non-nil pokemonIds")
 	}
 	query = "id IN (?, ?)"
-	expected = []models.Pokemon{
+	expected = []dtos.PokemonDto{
 		*newPokemon(pokemonIds[0], 0, "Test1", typeId, 0, 0, 0, "2017-07-06",
 			false, true, 0, 0, 0, 0),
 		*newPokemon(pokemonIds[1], 0, "Test2", typeId, 0, 0, 0, "2017-07-06",
@@ -135,8 +135,8 @@ func TestPokemonDao_Create(t *testing.T) {
 	var (
 		typeId   int64
 		err      error
-		expected *models.Pokemon
-		actual   *models.Pokemon
+		expected *dtos.PokemonDto
+		actual   *dtos.PokemonDto
 	)
 
 	// Defer teardown
@@ -175,8 +175,8 @@ func TestPokemonDao_Update(t *testing.T) {
 		optDef      float64
 		optSta      float64
 		err         error
-		expected    *models.Pokemon
-		actual      *models.Pokemon
+		expected    *dtos.PokemonDto
+		actual      *dtos.PokemonDto
 		verifySql   = "SELECT * " +
 			"FROM pvpgo.pokemon " +
 			"WHERE id = ?"
@@ -208,7 +208,7 @@ func TestPokemonDao_Delete(t *testing.T) {
 	// Initialize test variables
 	var (
 		pokemonId int64
-		pokemon   *models.Pokemon
+		pokemon   *dtos.PokemonDto
 		expected  int64 = 0
 		actual    int64
 		verifySql = "SELECT COUNT(*) " +

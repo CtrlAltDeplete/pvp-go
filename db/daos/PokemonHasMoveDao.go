@@ -1,13 +1,13 @@
-package db
+package daos
 
 import (
-	"PvP-Go/models"
+	"PvP-Go/db/dtos"
 	"database/sql"
 )
 
 type PokemonHasMoveDao struct{}
 
-func (dao *PokemonHasMoveDao) FindSingleWhere(query string, params ...interface{}) (error, *models.PokemonHasMove) {
+func (dao *PokemonHasMoveDao) FindSingleWhere(query string, params ...interface{}) (error, *dtos.PokemonHasMoveDto) {
 	var (
 		id        int64
 		pokemonId int64
@@ -40,7 +40,7 @@ func (dao *PokemonHasMoveDao) FindSingleWhere(query string, params ...interface{
 	}
 }
 
-func (dao *PokemonHasMoveDao) FindByPokemonAndMove(pokemonId, moveId int64) (error, *models.PokemonHasMove) {
+func (dao *PokemonHasMoveDao) FindByPokemonAndMove(pokemonId, moveId int64) (error, *dtos.PokemonHasMoveDto) {
 	var (
 		query = "pokemon_id = ? " +
 			"AND move_id = ?"
@@ -48,9 +48,9 @@ func (dao *PokemonHasMoveDao) FindByPokemonAndMove(pokemonId, moveId int64) (err
 	return dao.FindSingleWhere(query, pokemonId, moveId)
 }
 
-func (dao *PokemonHasMoveDao) FindWhere(query string, params ...interface{}) []models.PokemonHasMove {
+func (dao *PokemonHasMoveDao) FindWhere(query string, params ...interface{}) []dtos.PokemonHasMoveDto {
 	var (
-		pokemonHasMoves = []models.PokemonHasMove{}
+		pokemonHasMoves = []dtos.PokemonHasMoveDto{}
 		rows            *sql.Rows
 		err             error
 		id              int64
@@ -72,14 +72,14 @@ func (dao *PokemonHasMoveDao) FindWhere(query string, params ...interface{}) []m
 	return pokemonHasMoves
 }
 
-func (dao *PokemonHasMoveDao) FindAllByPokemonId(pokemonId int64) []models.PokemonHasMove {
+func (dao *PokemonHasMoveDao) FindAllByPokemonId(pokemonId int64) []dtos.PokemonHasMoveDto {
 	var (
 		query = "pokemon_id = ?"
 	)
 	return dao.FindWhere(query, pokemonId)
 }
 
-func (dao *PokemonHasMoveDao) Create(pokemonId, moveId int64, isLegacy bool) (error, *models.PokemonHasMove) {
+func (dao *PokemonHasMoveDao) Create(pokemonId, moveId int64, isLegacy bool) (error, *dtos.PokemonHasMoveDto) {
 	var (
 		result sql.Result
 		err    error
@@ -98,7 +98,7 @@ func (dao *PokemonHasMoveDao) Create(pokemonId, moveId int64, isLegacy bool) (er
 	return nil, newPokemonHasMove(id, pokemonId, moveId, isLegacy)
 }
 
-func (dao *PokemonHasMoveDao) Update(pokemonHasMove models.PokemonHasMove) {
+func (dao *PokemonHasMoveDao) Update(pokemonHasMove dtos.PokemonHasMoveDto) {
 	var (
 		err   error
 		query = "UPDATE pvpgo.pokemon_has_move " +
@@ -111,10 +111,10 @@ func (dao *PokemonHasMoveDao) Update(pokemonHasMove models.PokemonHasMove) {
 	CheckError(err)
 }
 
-func (dao *PokemonHasMoveDao) Upsert(pokemonId, moveId int64, isLegacy bool) (error, *models.PokemonHasMove) {
+func (dao *PokemonHasMoveDao) Upsert(pokemonId, moveId int64, isLegacy bool) (error, *dtos.PokemonHasMoveDto) {
 	var (
 		err            error
-		pokemonHasMove *models.PokemonHasMove
+		pokemonHasMove *dtos.PokemonHasMoveDto
 	)
 	err, pokemonHasMove = dao.FindByPokemonAndMove(pokemonId, moveId)
 	if err == NO_ROWS {
@@ -129,7 +129,7 @@ func (dao *PokemonHasMoveDao) Upsert(pokemonId, moveId int64, isLegacy bool) (er
 	return nil, pokemonHasMove
 }
 
-func (dao *PokemonHasMoveDao) Delete(pokemonHasMove models.PokemonHasMove) {
+func (dao *PokemonHasMoveDao) Delete(pokemonHasMove dtos.PokemonHasMoveDto) {
 	var (
 		err   error
 		query = "DELETE FROM pvpgo.pokemon_has_move " +
@@ -139,8 +139,8 @@ func (dao *PokemonHasMoveDao) Delete(pokemonHasMove models.PokemonHasMove) {
 	CheckError(err)
 }
 
-func newPokemonHasMove(id, pokemonId, moveId int64, isLegacy bool) *models.PokemonHasMove {
-	var phm = models.PokemonHasMove{}
+func newPokemonHasMove(id, pokemonId, moveId int64, isLegacy bool) *dtos.PokemonHasMoveDto {
+	var phm = dtos.PokemonHasMoveDto{}
 	phm.SetId(id)
 	phm.SetPokemonId(pokemonId)
 	phm.SetMoveId(moveId)

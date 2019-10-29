@@ -1,7 +1,7 @@
-package db
+package daos
 
 import (
-	"PvP-Go/models"
+	"PvP-Go/db/dtos"
 	"database/sql"
 	"reflect"
 	"testing"
@@ -16,8 +16,8 @@ func TestTypeMultipliersDao_FindSingleWhere(t *testing.T) {
 		multiplier       = 1.0
 		result           sql.Result
 		err              error
-		expected         *models.TypeMultiplier
-		actual           *models.TypeMultiplier
+		expected         *dtos.TypeMultiplierDto
+		actual           *dtos.TypeMultiplierDto
 		setupSql         = "INSERT INTO pvpgo.type_multipliers (receiving_type, acting_type, multiplier) " +
 			"VALUES (?, ?, ?)"
 	)
@@ -77,8 +77,8 @@ func TestTypeMultipliersDao_FindWhere(t *testing.T) {
 		typeMultiplierIds []int64
 		result            sql.Result
 		err               error
-		expected          []models.TypeMultiplier
-		actual            []models.TypeMultiplier
+		expected          []dtos.TypeMultiplierDto
+		actual            []dtos.TypeMultiplierDto
 		setupSql          = "INSERT INTO pvpgo.type_multipliers (receiving_type, acting_type, multiplier) " +
 			"VALUES (?, ?, ?)"
 	)
@@ -99,7 +99,7 @@ func TestTypeMultipliersDao_FindWhere(t *testing.T) {
 	/* No Results Test */
 	// Prepare test variables
 	query = "id <= ?"
-	expected = []models.TypeMultiplier{}
+	expected = []dtos.TypeMultiplierDto{}
 	actual = TYPE_MULTIPLIER_DAO.FindWhere(query, 0)
 
 	// Check expected vs actual
@@ -113,7 +113,7 @@ func TestTypeMultipliersDao_FindWhere(t *testing.T) {
 		panic("Expected non-nil typeMultiplierIds")
 	}
 	query = "id IN (?, ?)"
-	expected = []models.TypeMultiplier{
+	expected = []dtos.TypeMultiplierDto{
 		*newTypeMultiplier(typeMultiplierIds[0], typeId, 1, 1.0),
 		*newTypeMultiplier(typeMultiplierIds[1], typeId, 2, 1.0),
 	}
@@ -131,8 +131,8 @@ func TestTypeMultipliersDao_Create(t *testing.T) {
 		typeId     int64
 		multiplier = 1.0
 		err        error
-		expected   *models.TypeMultiplier
-		actual     *models.TypeMultiplier
+		expected   *dtos.TypeMultiplierDto
+		actual     *dtos.TypeMultiplierDto
 	)
 
 	// Defer teardown
@@ -159,8 +159,8 @@ func TestTypeMultipliersDao_Update(t *testing.T) {
 		actingType       int64
 		multiplier       float64
 		err              error
-		expected         *models.TypeMultiplier
-		actual           *models.TypeMultiplier
+		expected         *dtos.TypeMultiplierDto
+		actual           *dtos.TypeMultiplierDto
 		verifySql        = "SELECT * " +
 			"FROM pvpgo.type_multipliers " +
 			"WHERE id = ?"
@@ -188,7 +188,7 @@ func TestTypeMultipliersDao_Delete(t *testing.T) {
 	var (
 		typeId           int64
 		typeMultiplierId int64
-		typeMultiplier   *models.TypeMultiplier
+		typeMultiplier   *dtos.TypeMultiplierDto
 		expected         int64 = 0
 		actual           int64
 		verifySql        = "SELECT COUNT(*) " +

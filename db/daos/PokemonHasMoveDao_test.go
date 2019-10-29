@@ -1,7 +1,7 @@
-package db
+package daos
 
 import (
-	"PvP-Go/models"
+	"PvP-Go/db/dtos"
 	"database/sql"
 	"reflect"
 	"testing"
@@ -16,8 +16,8 @@ func TestPokemonHasMoveDao_FindSingleWhere(t *testing.T) {
 		pokemonHasMoveId int64
 		result           sql.Result
 		err              error
-		expected         *models.PokemonHasMove
-		actual           *models.PokemonHasMove
+		expected         *dtos.PokemonHasMoveDto
+		actual           *dtos.PokemonHasMoveDto
 		setupSql         = "INSERT INTO pvpgo.pokemon_has_move (pokemon_id, move_id) " +
 			"VALUES (?, ?)"
 	)
@@ -78,8 +78,8 @@ func TestPokemonHasMoveDao_FindWhere(t *testing.T) {
 		pokemonHasMoveIds []int64
 		result            sql.Result
 		err               error
-		expected          []models.PokemonHasMove
-		actual            []models.PokemonHasMove
+		expected          []dtos.PokemonHasMoveDto
+		actual            []dtos.PokemonHasMoveDto
 		setupSql          = "INSERT INTO pvpgo.pokemon_has_move (pokemon_id, move_id) " +
 			"VALUES (?, ?)"
 	)
@@ -100,7 +100,7 @@ func TestPokemonHasMoveDao_FindWhere(t *testing.T) {
 	/* No Results Test */
 	// Prepare test variables
 	query = "id <= ?"
-	expected = []models.PokemonHasMove{}
+	expected = []dtos.PokemonHasMoveDto{}
 	actual = POKEMON_HAS_MOVE_DAO.FindWhere(query, 0)
 
 	// Check expected vs actual
@@ -114,7 +114,7 @@ func TestPokemonHasMoveDao_FindWhere(t *testing.T) {
 		panic("Expected non-nil pokemonHasMoveIds")
 	}
 	query = "id IN (?, ?)"
-	expected = []models.PokemonHasMove{
+	expected = []dtos.PokemonHasMoveDto{
 		*newPokemonHasMove(pokemonHasMoveIds[0], pokemonId, 1, false),
 		*newPokemonHasMove(pokemonHasMoveIds[1], pokemonId, 2, false),
 	}
@@ -132,8 +132,8 @@ func TestPokemonHasMoveDao_Create(t *testing.T) {
 		pokemonId int64
 		moveId    int64
 		err       error
-		expected  *models.PokemonHasMove
-		actual    *models.PokemonHasMove
+		expected  *dtos.PokemonHasMoveDto
+		actual    *dtos.PokemonHasMoveDto
 	)
 
 	// Defer teardown
@@ -160,8 +160,8 @@ func TestPokemonHasMoveDao_Update(t *testing.T) {
 		pokemonHasMoveId int64
 		isLegacy         bool
 		err              error
-		expected         *models.PokemonHasMove
-		actual           *models.PokemonHasMove
+		expected         *dtos.PokemonHasMoveDto
+		actual           *dtos.PokemonHasMoveDto
 		verifySql        = "SELECT * " +
 			"FROM pvpgo.pokemon_has_move " +
 			"WHERE id = ?"
@@ -190,7 +190,7 @@ func TestPokemonHasMoveDao_Delete(t *testing.T) {
 		pokemonId        int64
 		moveId           int64
 		pokemonHasMoveId int64
-		pokemonHasMove   *models.PokemonHasMove
+		pokemonHasMove   *dtos.PokemonHasMoveDto
 		expected         int64 = 0
 		actual           int64
 		verifySql        = "SELECT COUNT(*) " +

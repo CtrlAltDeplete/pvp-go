@@ -1,8 +1,8 @@
 package rawData
 
 import (
-	"PvP-Go/db"
-	"PvP-Go/models"
+	"PvP-Go/db/daos"
+	"PvP-Go/db/dtos"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -48,7 +48,7 @@ func DownloadJsonFiles() {
 
 	if _, err = os.Stat(JSON_DIRECTORY); os.IsNotExist(err) {
 		err = os.MkdirAll(JSON_DIRECTORY, os.ModePerm)
-		db.CheckError(err)
+		daos.CheckError(err)
 	}
 
 	downloadFile(TYPE_CHART_JSON, JSON_DIRECTORY+"type_chart.json")
@@ -63,13 +63,13 @@ func downloadFile(url, path string) {
 		e    error
 	)
 	resp, e = http.Get(url)
-	db.CheckError(e)
+	daos.CheckError(e)
 	out, e = os.Create(path)
-	db.CheckError(e)
+	daos.CheckError(e)
 	_, e = io.Copy(out, resp.Body)
-	db.CheckError(e)
-	db.CheckError(resp.Body.Close())
-	db.CheckError(out.Close())
+	daos.CheckError(e)
+	daos.CheckError(resp.Body.Close())
+	daos.CheckError(out.Close())
 }
 
 type typeChartDto struct {
@@ -97,30 +97,30 @@ func FillTypeChartDto(dto *typeChartDto) {
 
 func ParseAllTypeCharts() {
 	contents, err := ioutil.ReadFile(JSON_DIRECTORY + "type_chart.json")
-	db.CheckError(err)
+	daos.CheckError(err)
 
 	var typeChartDtos []typeChartDto
 	err = json.Unmarshal(contents, &typeChartDtos)
-	db.CheckError(err)
+	daos.CheckError(err)
 
-	baseTypes := []*models.PokemonType{}
+	baseTypes := []*dtos.TypeDto{}
 	for _, t := range BASE_TYPES {
-		err, bt := db.TYPES_DAO.Upsert(t, nil)
-		db.CheckError(err)
+		err, bt := daos.TYPES_DAO.Upsert(t, nil)
+		daos.CheckError(err)
 		baseTypes = append(baseTypes, bt)
 	}
 
-	var receivingType, actingType *models.PokemonType
+	var receivingType, actingType *dtos.TypeDto
 	for _, dto := range typeChartDtos {
 		FillTypeChartDto(&dto)
 		if len(dto.types) == 1 {
-			err, receivingType = db.TYPES_DAO.Upsert(dto.types[0], nil)
+			err, receivingType = daos.TYPES_DAO.Upsert(dto.types[0], nil)
 		} else {
-			err, receivingType = db.TYPES_DAO.Upsert(dto.types[1], dto.types[1])
+			err, receivingType = daos.TYPES_DAO.Upsert(dto.types[1], dto.types[1])
 		}
-		db.CheckError(err)
+		daos.CheckError(err)
 		for _, actingType = range baseTypes {
-			err, _ = db.TYPE_MULTIPLIER_DAO.Upsert(receivingType.Id(), actingType.Id(), dto.multipliers[actingType.DisplayName()])
+			err, _ = daos.TYPE_MULTIPLIER_DAO.Upsert(receivingType.Id(), actingType.Id(), dto.multipliers[actingType.DisplayName()])
 		}
 	}
 }
@@ -129,12 +129,12 @@ type moveDto struct {
 	Title                  string `json:"title"`
 	Power                  string `json:"power"`
 	Cooldown               string `json:"cooldown"`
-	MoveType               string `json:"move_type"` // PokemonType (toLower)
+	MoveType               string `json:"move_type"` // TypeDto (toLower)
 	Nid                    string `json:"nid"`
 	EnergyGain             string `json:"energy_gain"`
 	EnergyCost             string `json:"energy_cost"`
 	DodgeWindow            string `json:"dodge_window"`
-	MoveCategory           string `json:"move_category"` // "Fast Move", "Charge Move", ""
+	MoveCategory           string `json:"move_category"` // "Fast MoveDto", "Charge MoveDto", ""
 	DamageWindow           string `json:"damage_window"`
 	PvpChargeEnergy        string `json:"pvp_charge_energy"`
 	PvpChargeDamage        string `json:"pvp_charge_damage"`
@@ -160,47 +160,47 @@ type moveDto struct {
 
 func FillMoveDto(dto *moveDto) {
 	dto.name = dto.Title
-	err, pokemonType := db.TYPES_DAO.FindSingleByType(strings.ToLower(dto.MoveType))
+	err, pokemonType := daos.TYPES_DAO.FindSingleByType(strings.ToLower(dto.MoveType))
 	if err != nil {
 		log.Printf("No type %s for move %s.\n", strings.ToLower(dto.MoveType), dto.Title)
 		return
 	}
 	dto.typeId = pokemonType.Id()
 
-	if dto.MoveCategory == "Fast Move" {
+	if dto.MoveCategory == "Fast MoveDto" {
 		dto.power, err = strconv.ParseInt(dto.PvpFastPower, 10, 64)
-		db.CheckError(err)
+		daos.CheckError(err)
 
 		dto.turns, err = strconv.ParseInt(dto.PvpFastDuration, 10, 64)
-		db.CheckError(err)
+		daos.CheckError(err)
 		dto.turns += 1
 
 		dto.energy, err = strconv.ParseInt(dto.PvpFastEnergy, 10, 64)
-		db.CheckError(err)
+		daos.CheckError(err)
 
 		dto.probability.Valid = false
 		dto.stageDelta.Valid = false
 		dto.stats.Valid = false
 		dto.target.Valid = false
-	} else if dto.MoveCategory == "Charge Move" {
+	} else if dto.MoveCategory == "Charge MoveDto" {
 		dto.power, err = strconv.ParseInt(dto.PvpChargeDamage, 10, 64)
-		db.CheckError(err)
+		daos.CheckError(err)
 
 		dto.turns = 1
 
 		dto.energy, err = strconv.ParseInt(dto.PvpChargeEnergy, 10, 64)
-		db.CheckError(err)
+		daos.CheckError(err)
 
 		dto.probability.Valid = dto.Probability != ""
 		if dto.probability.Valid {
 			dto.probability.Float64, err = strconv.ParseFloat(dto.Probability, 64)
-			db.CheckError(err)
+			daos.CheckError(err)
 		}
 
 		dto.stageDelta.Valid = dto.StageDelta != ""
 		if dto.stageDelta.Valid {
 			dto.stageDelta.Int64, err = strconv.ParseInt(dto.StageDelta, 10, 64)
-			db.CheckError(err)
+			daos.CheckError(err)
 		}
 
 		dto.stats.String = dto.Stat
@@ -216,17 +216,17 @@ func FillMoveDto(dto *moveDto) {
 
 func ParseAllMoves() {
 	contents, e := ioutil.ReadFile(JSON_DIRECTORY + "moves.json")
-	db.CheckError(e)
+	daos.CheckError(e)
 
 	var moveDtos []moveDto
 	e = json.Unmarshal(contents, &moveDtos)
-	db.CheckError(e)
+	daos.CheckError(e)
 
 	for _, dto := range moveDtos {
 		FillMoveDto(&dto)
-		err, _ := db.MOVES_DAO.Upsert(dto.name, dto.typeId, dto.power, dto.turns, dto.energy, dto.probability,
+		err, _ := daos.MOVES_DAO.Upsert(dto.name, dto.typeId, dto.power, dto.turns, dto.energy, dto.probability,
 			dto.stageDelta, dto.stats, dto.target)
-		db.CheckError(err)
+		daos.CheckError(err)
 	}
 }
 
@@ -278,10 +278,10 @@ func FillPokemonAndMovesetDto(dto *pokemonAndMovesetsDto) error {
 	types := strings.Split(strings.ToLower(dto.FieldPokemonType), ", ")
 
 	var err error
-	var pokemonType *models.PokemonType
-	err, pokemonType = db.TYPES_DAO.FindSingleByTypes(types)
-	if err == db.NO_ROWS {
-		log.Printf("Cannot find PokemonType for %v for %s.\n", types, dto.name)
+	var pokemonType *dtos.TypeDto
+	err, pokemonType = daos.TYPES_DAO.FindSingleByTypes(types)
+	if err == daos.NO_ROWS {
+		log.Printf("Cannot find TypeDto for %v for %s.\n", types, dto.name)
 		return err
 	} else if err != nil {
 		return err
@@ -289,13 +289,13 @@ func FillPokemonAndMovesetDto(dto *pokemonAndMovesetsDto) error {
 	dto.typeId = pokemonType.Id()
 
 	dto.atk, err = strconv.ParseFloat(dto.Atk, 64)
-	db.CheckError(err)
+	daos.CheckError(err)
 
 	dto.def, err = strconv.ParseFloat(dto.Def, 64)
-	db.CheckError(err)
+	daos.CheckError(err)
 
 	dto.sta, err = strconv.ParseFloat(dto.Sta, 64)
-	db.CheckError(err)
+	daos.CheckError(err)
 
 	r := regexp.MustCompile(`.*/pokemongo/files/(\d*)-(\d*).*`)
 	matches := r.FindAllStringSubmatch(dto.Uri, -1)[0]
@@ -316,15 +316,15 @@ func FillPokemonAndMovesetDto(dto *pokemonAndMovesetsDto) error {
 	}
 
 	dto.fastMoveIdAndIsLegacy = map[int64]bool{}
-	var move *models.Move
+	var move *dtos.MoveDto
 	dto.chargeMoveIdAndIsLegacy = map[int64]bool{}
 
 	for _, fastName := range strings.Split(dto.FieldPrimaryMoves, ", ") {
 		if fastName == "" {
 			continue
 		}
-		err, move = db.MOVES_DAO.FindByName(fastName)
-		if err == db.NO_ROWS {
+		err, move = daos.MOVES_DAO.FindByName(fastName)
+		if err == daos.NO_ROWS {
 			log.Printf("Could not find move %s for pokemon %s.\n", fastName, dto.name)
 		} else if err != nil {
 			log.Print(err.Error())
@@ -337,8 +337,8 @@ func FillPokemonAndMovesetDto(dto *pokemonAndMovesetsDto) error {
 		if chargeName == "" {
 			continue
 		}
-		err, move = db.MOVES_DAO.FindByName(chargeName)
-		if err == db.NO_ROWS {
+		err, move = daos.MOVES_DAO.FindByName(chargeName)
+		if err == daos.NO_ROWS {
 			log.Printf("Could not find move %s for pokemon %s.\n", chargeName, dto.name)
 		} else if err != nil {
 			log.Print(err.Error())
@@ -351,8 +351,8 @@ func FillPokemonAndMovesetDto(dto *pokemonAndMovesetsDto) error {
 		if fastName == "" {
 			continue
 		}
-		err, move = db.MOVES_DAO.FindByName(fastName)
-		if err == db.NO_ROWS {
+		err, move = daos.MOVES_DAO.FindByName(fastName)
+		if err == daos.NO_ROWS {
 			log.Printf("Could not find move %s for pokemon %s.\n", fastName, dto.name)
 		} else if err != nil {
 			log.Print(err.Error())
@@ -365,8 +365,8 @@ func FillPokemonAndMovesetDto(dto *pokemonAndMovesetsDto) error {
 		if chargeName == "" {
 			continue
 		}
-		err, move = db.MOVES_DAO.FindByName(chargeName)
-		if err == db.NO_ROWS {
+		err, move = daos.MOVES_DAO.FindByName(chargeName)
+		if err == daos.NO_ROWS {
 			log.Printf("Could not find move %s for pokemon %s.\n", chargeName, dto.name)
 		} else if err != nil {
 			log.Print(err.Error())
@@ -379,8 +379,8 @@ func FillPokemonAndMovesetDto(dto *pokemonAndMovesetsDto) error {
 		if fastName == "" {
 			continue
 		}
-		err, move = db.MOVES_DAO.FindByName(fastName)
-		if err == db.NO_ROWS {
+		err, move = daos.MOVES_DAO.FindByName(fastName)
+		if err == daos.NO_ROWS {
 			log.Printf("Could not find move %s for pokemon %s.\n", fastName, dto.name)
 		} else if err != nil {
 			log.Print(err.Error())
@@ -393,8 +393,8 @@ func FillPokemonAndMovesetDto(dto *pokemonAndMovesetsDto) error {
 		if chargeName == "" {
 			continue
 		}
-		err, move = db.MOVES_DAO.FindByName(chargeName)
-		if err == db.NO_ROWS {
+		err, move = daos.MOVES_DAO.FindByName(chargeName)
+		if err == daos.NO_ROWS {
 			log.Printf("Could not find move %s for pokemon %s.\n", chargeName, dto.name)
 		} else if err != nil {
 			log.Print(err.Error())
@@ -413,13 +413,13 @@ func FillPokemonAndMovesetDto(dto *pokemonAndMovesetsDto) error {
 
 func ParseAllPokemonAndMovesets() {
 	contents, e := ioutil.ReadFile(JSON_DIRECTORY + "pokemon_and_movesets.json")
-	db.CheckError(e)
+	daos.CheckError(e)
 
 	var pokemonAndMovesetsDtos []pokemonAndMovesetsDto
 	e = json.Unmarshal(contents, &pokemonAndMovesetsDtos)
-	db.CheckError(e)
+	daos.CheckError(e)
 
-	var pokemon *models.Pokemon
+	var pokemon *dtos.PokemonDto
 
 	for i, dto := range pokemonAndMovesetsDtos {
 		err := FillPokemonAndMovesetDto(&dto)
@@ -427,17 +427,17 @@ func ParseAllPokemonAndMovesets() {
 			log.Printf("[%d/%d] %f%% complete.\n", i, len(pokemonAndMovesetsDtos), (100.0 * float64(i) / float64(len(pokemonAndMovesetsDtos))))
 			continue
 		}
-		err, pokemon = db.POKEMON_DAO.Upsert(dto.gen, dto.name, dto.typeId, dto.atk, dto.def, dto.sta, dto.dateAdd,
+		err, pokemon = daos.POKEMON_DAO.Upsert(dto.gen, dto.name, dto.typeId, dto.atk, dto.def, dto.sta, dto.dateAdd,
 			dto.isLegendary, dto.isPvpEligible, 0, 0, 0, 0)
-		db.CheckError(err)
+		daos.CheckError(err)
 
 		for moveId, isMoveLegacy := range dto.fastMoveIdAndIsLegacy {
-			err, _ = db.POKEMON_HAS_MOVE_DAO.Upsert(pokemon.Id(), moveId, isMoveLegacy)
-			db.CheckError(err)
+			err, _ = daos.POKEMON_HAS_MOVE_DAO.Upsert(pokemon.Id(), moveId, isMoveLegacy)
+			daos.CheckError(err)
 		}
 		for moveId, isMoveLegacy := range dto.chargeMoveIdAndIsLegacy {
-			err, _ = db.POKEMON_HAS_MOVE_DAO.Upsert(pokemon.Id(), moveId, isMoveLegacy)
-			db.CheckError(err)
+			err, _ = daos.POKEMON_HAS_MOVE_DAO.Upsert(pokemon.Id(), moveId, isMoveLegacy)
+			daos.CheckError(err)
 		}
 		log.Printf("[%d/%d] %f%% complete.\n", i, len(pokemonAndMovesetsDtos), (100.0 * float64(i) / float64(len(pokemonAndMovesetsDtos))))
 	}

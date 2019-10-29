@@ -1,4 +1,4 @@
-package models
+package dtos
 
 import (
 	"database/sql"
@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-type Move struct {
+type MoveDto struct {
 	id            int64
 	name          string
 	typeId        int64
@@ -18,63 +18,63 @@ type Move struct {
 	target        sql.NullString
 }
 
-func (m *Move) Id() int64 {
+func (m *MoveDto) Id() int64 {
 	return m.id
 }
 
-func (m *Move) SetId(id int64) {
+func (m *MoveDto) SetId(id int64) {
 	m.id = id
 }
 
-func (m *Move) Name() string {
+func (m *MoveDto) Name() string {
 	return m.name
 }
 
-func (m *Move) SetName(name string) {
+func (m *MoveDto) SetName(name string) {
 	m.name = name
 }
 
-func (m *Move) TypeId() int64 {
+func (m *MoveDto) TypeId() int64 {
 	return m.typeId
 }
 
-func (m *Move) SetTypeId(typeId int64) {
+func (m *MoveDto) SetTypeId(typeId int64) {
 	m.typeId = typeId
 }
 
-func (m *Move) Power() float64 {
+func (m *MoveDto) Power() float64 {
 	return m.power
 }
 
-func (m *Move) SetPower(power float64) {
+func (m *MoveDto) SetPower(power float64) {
 	m.power = power
 }
 
-func (m *Move) Turns() int64 {
+func (m *MoveDto) Turns() int64 {
 	return m.turns
 }
 
-func (m *Move) SetTurns(turns int64) {
+func (m *MoveDto) SetTurns(turns int64) {
 	m.turns = turns
 }
 
-func (m *Move) Energy() int64 {
+func (m *MoveDto) Energy() int64 {
 	return m.energy
 }
 
-func (m *Move) SetEnergy(energy int64) {
+func (m *MoveDto) SetEnergy(energy int64) {
 	m.energy = energy
 }
 
-func (m *Move) Probability() int64 {
+func (m *MoveDto) Probability() int64 {
 	return m.stageDelta.Int64
 }
 
-func (m *Move) ProbabilityNullable() sql.NullInt64 {
+func (m *MoveDto) ProbabilityNullable() sql.NullInt64 {
 	return m.stageDelta
 }
 
-func (m *Move) SetProbability(probability interface{}) {
+func (m *MoveDto) SetProbability(probability interface{}) {
 	switch p := probability.(type) {
 	case float64:
 		m.probability.Valid = true
@@ -93,15 +93,15 @@ func (m *Move) SetProbability(probability interface{}) {
 	}
 }
 
-func (m *Move) StageDelta() float64 {
+func (m *MoveDto) StageDelta() float64 {
 	return m.probability.Float64
 }
 
-func (m *Move) StageDeltaNullable() sql.NullFloat64 {
+func (m *MoveDto) StageDeltaNullable() sql.NullFloat64 {
 	return m.probability
 }
 
-func (m *Move) SetStageDelta(stageDelta interface{}) {
+func (m *MoveDto) SetStageDelta(stageDelta interface{}) {
 	switch sd := stageDelta.(type) {
 	case int64:
 		m.stageDelta.Valid = true
@@ -120,15 +120,15 @@ func (m *Move) SetStageDelta(stageDelta interface{}) {
 	}
 }
 
-func (m *Move) Stats() []string {
+func (m *MoveDto) Stats() []string {
 	return strings.Split(m.stats.String, ", ")
 }
 
-func (m *Move) StatsNullable() sql.NullString {
+func (m *MoveDto) StatsNullable() sql.NullString {
 	return m.stats
 }
 
-func (m *Move) SetStats(stats interface{}) {
+func (m *MoveDto) SetStats(stats interface{}) {
 	switch s := stats.(type) {
 	case string:
 		m.stats.Valid = true
@@ -150,15 +150,15 @@ func (m *Move) SetStats(stats interface{}) {
 	}
 }
 
-func (m *Move) Target() string {
+func (m *MoveDto) Target() string {
 	return m.target.String
 }
 
-func (m *Move) TargetNullable() sql.NullString {
+func (m *MoveDto) TargetNullable() sql.NullString {
 	return m.target
 }
 
-func (m *Move) SetTarget(target interface{}) {
+func (m *MoveDto) SetTarget(target interface{}) {
 	switch t := target.(type) {
 	case string:
 		m.target.Valid = true

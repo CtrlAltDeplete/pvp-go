@@ -1,7 +1,7 @@
-package db
+package daos
 
 import (
-	"PvP-Go/models"
+	"PvP-Go/db/dtos"
 	"database/sql"
 	"fmt"
 	"reflect"
@@ -16,8 +16,8 @@ func TestMovesDao_FindSingleWhere(t *testing.T) {
 		moveId   int64
 		result   sql.Result
 		err      error
-		expected *models.Move
-		actual   *models.Move
+		expected *dtos.MoveDto
+		actual   *dtos.MoveDto
 		setupSql = "INSERT INTO pvpgo.moves (name, type_id, power, turns, energy) " +
 			"VALUES (?, ?, 0, 0, 0)"
 	)
@@ -79,8 +79,8 @@ func TestMovesDao_FindWhere(t *testing.T) {
 		moveIds  []int64
 		result   sql.Result
 		err      error
-		expected []models.Move
-		actual   []models.Move
+		expected []dtos.MoveDto
+		actual   []dtos.MoveDto
 		setupSql = "INSERT INTO pvpgo.moves (name, type_id, power, turns, energy) " +
 			"VALUES (?, ?, 0, 0, 0)"
 	)
@@ -102,7 +102,7 @@ func TestMovesDao_FindWhere(t *testing.T) {
 	/* No Results Test */
 	// Prepare test variables
 	query = "id <= ?"
-	expected = []models.Move{}
+	expected = []dtos.MoveDto{}
 	actual = MOVES_DAO.FindWhere(query, 0)
 
 	// Check expected vs actual
@@ -116,7 +116,7 @@ func TestMovesDao_FindWhere(t *testing.T) {
 		panic("Expected non-nil moveIds")
 	}
 	query = "id IN (?, ?)"
-	expected = []models.Move{
+	expected = []dtos.MoveDto{
 		*newMove(moveIds[0], "Test1", typeId, 0, 0, 0, nil, nil,
 			nil, nil),
 		*newMove(moveIds[1], "Test2", typeId, 0, 0, 0, nil, nil,
@@ -135,8 +135,8 @@ func TestMovesDao_Create(t *testing.T) {
 	var (
 		typeId   int64
 		err      error
-		expected *models.Move
-		actual   *models.Move
+		expected *dtos.MoveDto
+		actual   *dtos.MoveDto
 	)
 
 	// Defer teardown
@@ -171,8 +171,8 @@ func TestMovesDao_Update(t *testing.T) {
 		stats       sql.NullString
 		target      sql.NullString
 		err         error
-		expected    *models.Move
-		actual      *models.Move
+		expected    *dtos.MoveDto
+		actual      *dtos.MoveDto
 		verifySql   = "SELECT * " +
 			"FROM pvpgo.moves " +
 			"WHERE id = ?"
@@ -204,7 +204,7 @@ func TestMovesDao_Delete(t *testing.T) {
 	// Initialize test variables
 	var (
 		moveId    int64
-		move      *models.Move
+		move      *dtos.MoveDto
 		expected  int64 = 0
 		actual    int64
 		verifySql = "SELECT COUNT(*) " +

@@ -1,47 +1,47 @@
-package models
+package dtos
 
 import (
 	"database/sql"
 	"log"
 )
 
-type PokemonType struct {
+type TypeDto struct {
 	id          int64
 	firstType   string
 	secondType  sql.NullString
 	displayName string
 }
 
-func (p *PokemonType) Id() int64 {
+func (p *TypeDto) Id() int64 {
 	return p.id
 }
 
-func (p *PokemonType) SetId(id int64) {
+func (p *TypeDto) SetId(id int64) {
 	p.id = id
 }
 
-func (p *PokemonType) FirstType() string {
+func (p *TypeDto) FirstType() string {
 	return p.firstType
 }
 
-func (p *PokemonType) SetFirstType(firstType string) {
+func (p *TypeDto) SetFirstType(firstType string) {
 	p.firstType = firstType
 	p.updateDisplayName()
 }
 
-func (p *PokemonType) IsSecondTypeNull() bool {
+func (p *TypeDto) IsSecondTypeNull() bool {
 	return !p.secondType.Valid
 }
 
-func (p *PokemonType) SecondType() string {
+func (p *TypeDto) SecondType() string {
 	return p.secondType.String
 }
 
-func (p *PokemonType) SecondTypeNullable() sql.NullString {
+func (p *TypeDto) SecondTypeNullable() sql.NullString {
 	return p.secondType
 }
 
-func (p *PokemonType) SetSecondType(secondType interface{}) {
+func (p *TypeDto) SetSecondType(secondType interface{}) {
 	switch st := secondType.(type) {
 	case string:
 		p.secondType.Valid = true
@@ -61,15 +61,15 @@ func (p *PokemonType) SetSecondType(secondType interface{}) {
 	p.updateDisplayName()
 }
 
-func (p *PokemonType) DisplayName() string {
+func (p *TypeDto) DisplayName() string {
 	return p.displayName
 }
 
-func (p *PokemonType) SetDisplayName(displayName string) {
+func (p *TypeDto) SetDisplayName(displayName string) {
 	p.displayName = displayName
 }
 
-func (p *PokemonType) updateDisplayName() {
+func (p *TypeDto) updateDisplayName() {
 	if p.IsSecondTypeNull() {
 		p.SetDisplayName(p.FirstType())
 	} else {

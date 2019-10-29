@@ -1,14 +1,14 @@
-package db
+package daos
 
 import (
-	"PvP-Go/models"
+	"PvP-Go/db/dtos"
 	"database/sql"
 	"strings"
 )
 
 type MovesDao struct{}
 
-func (dao *MovesDao) FindSingleWhere(query string, params ...interface{}) (error, *models.Move) {
+func (dao *MovesDao) FindSingleWhere(query string, params ...interface{}) (error, *dtos.MoveDto) {
 	var (
 		id                           int64
 		name                         string
@@ -40,23 +40,23 @@ func (dao *MovesDao) FindSingleWhere(query string, params ...interface{}) (error
 	}
 }
 
-func (dao *MovesDao) FindById(id int64) (error, *models.Move) {
+func (dao *MovesDao) FindById(id int64) (error, *dtos.MoveDto) {
 	var (
 		query = "id = ?"
 	)
 	return dao.FindSingleWhere(query, id)
 }
 
-func (dao *MovesDao) FindByName(name string) (error, *models.Move) {
+func (dao *MovesDao) FindByName(name string) (error, *dtos.MoveDto) {
 	var (
 		query = "name = ?"
 	)
 	return dao.FindSingleWhere(query, name)
 }
 
-func (dao *MovesDao) FindWhere(query string, params ...interface{}) []models.Move {
+func (dao *MovesDao) FindWhere(query string, params ...interface{}) []dtos.MoveDto {
 	var (
-		moves                        = []models.Move{}
+		moves                        = []dtos.MoveDto{}
 		rows                         *sql.Rows
 		e                            error
 		id                           int64
@@ -80,14 +80,14 @@ func (dao *MovesDao) FindWhere(query string, params ...interface{}) []models.Mov
 	return moves
 }
 
-func (dao *MovesDao) FindByTypeId(id int64) []models.Move {
+func (dao *MovesDao) FindByTypeId(id int64) []dtos.MoveDto {
 	var (
 		query = "type_id = ?"
 	)
 	return dao.FindWhere(query, id)
 }
 
-func (dao *MovesDao) FindByTypeIds(ids []int64) []models.Move {
+func (dao *MovesDao) FindByTypeIds(ids []int64) []dtos.MoveDto {
 	var (
 		id     int64
 		params []interface{}
@@ -99,12 +99,12 @@ func (dao *MovesDao) FindByTypeIds(ids []int64) []models.Move {
 	return dao.FindWhere(query, params...)
 }
 
-func (dao *MovesDao) FindAll() []models.Move {
+func (dao *MovesDao) FindAll() []dtos.MoveDto {
 	return dao.FindWhere("TRUE")
 }
 
 func (dao *MovesDao) Create(name string, typeId, power, turns, energy int64, probability, stageDelta, stats,
-	target interface{}) (error, *models.Move) {
+	target interface{}) (error, *dtos.MoveDto) {
 	var (
 		result sql.Result
 		err    error
@@ -123,7 +123,7 @@ func (dao *MovesDao) Create(name string, typeId, power, turns, energy int64, pro
 	return nil, newMove(id, name, typeId, power, turns, energy, probability, stageDelta, stats, target)
 }
 
-func (dao *MovesDao) Update(move models.Move) {
+func (dao *MovesDao) Update(move dtos.MoveDto) {
 	var (
 		e     error
 		query = "UPDATE pvpgo.moves " +
@@ -144,10 +144,10 @@ func (dao *MovesDao) Update(move models.Move) {
 }
 
 func (dao *MovesDao) Upsert(name string, typeId, power, turns, energy int64, probability, stageDelta, stats,
-	target interface{}) (error, *models.Move) {
+	target interface{}) (error, *dtos.MoveDto) {
 	var (
 		err  error
-		move *models.Move
+		move *dtos.MoveDto
 	)
 	err, move = dao.FindByName(name)
 	if err == NO_ROWS {
@@ -169,7 +169,7 @@ func (dao *MovesDao) Upsert(name string, typeId, power, turns, energy int64, pro
 	return nil, move
 }
 
-func (dao *MovesDao) Delete(move models.Move) {
+func (dao *MovesDao) Delete(move dtos.MoveDto) {
 	var (
 		e     error
 		query = "DELETE FROM pvpgo.moves " +
@@ -180,8 +180,8 @@ func (dao *MovesDao) Delete(move models.Move) {
 }
 
 func newMove(id int64, name string, typeId int64, power int64, turns int64, energy int64, probability interface{},
-	stageDelta interface{}, stats interface{}, target interface{}) *models.Move {
-	var m = models.Move{}
+	stageDelta interface{}, stats interface{}, target interface{}) *dtos.MoveDto {
+	var m = dtos.MoveDto{}
 	m.SetId(id)
 	m.SetName(name)
 	m.SetTypeId(typeId)
