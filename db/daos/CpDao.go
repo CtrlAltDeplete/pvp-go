@@ -69,6 +69,10 @@ func (dao *CpDao) FindWhere(query string, params ...interface{}) []dtos.CpMultip
 	return cpMultipliers
 }
 
+func (dao *CpDao) FindAll() []dtos.CpMultiplierDto {
+	return dao.FindWhere("TRUE ORDER BY level ASC")
+}
+
 func (dao *CpDao) Create(level, multiplier float64) (error, *dtos.CpMultiplierDto) {
 	var (
 		result sql.Result

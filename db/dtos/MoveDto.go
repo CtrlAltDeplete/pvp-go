@@ -18,6 +18,11 @@ type MoveDto struct {
 	target        sql.NullString
 }
 
+var (
+	BUFF_SELF    = "Self"
+	DEBUFF_ENEMY = "Opponent"
+)
+
 func (m *MoveDto) Id() int64 {
 	return m.id
 }
@@ -66,12 +71,12 @@ func (m *MoveDto) SetEnergy(energy int64) {
 	m.energy = energy
 }
 
-func (m *MoveDto) Probability() int64 {
-	return m.stageDelta.Int64
+func (m *MoveDto) Probability() float64 {
+	return m.probability.Float64
 }
 
-func (m *MoveDto) ProbabilityNullable() sql.NullInt64 {
-	return m.stageDelta
+func (m *MoveDto) ProbabilityNullable() sql.NullFloat64 {
+	return m.probability
 }
 
 func (m *MoveDto) SetProbability(probability interface{}) {
@@ -93,12 +98,12 @@ func (m *MoveDto) SetProbability(probability interface{}) {
 	}
 }
 
-func (m *MoveDto) StageDelta() float64 {
-	return m.probability.Float64
+func (m *MoveDto) StageDelta() int64 {
+	return m.stageDelta.Int64
 }
 
-func (m *MoveDto) StageDeltaNullable() sql.NullFloat64 {
-	return m.probability
+func (m *MoveDto) StageDeltaNullable() sql.NullInt64 {
+	return m.stageDelta
 }
 
 func (m *MoveDto) SetStageDelta(stageDelta interface{}) {

@@ -24,7 +24,7 @@ func (tm *TypeMultiplierDto) SetReceivingType(receivingType int64) {
 }
 
 func (tm *TypeMultiplierDto) ActingType() int64 {
-	return tm.receivingType
+	return tm.actingType
 }
 
 func (tm *TypeMultiplierDto) SetActingType(actingType int64) {
