@@ -16,8 +16,10 @@ var (
 	NO_ROWS              = errors.New("No rows found.")
 	MULTIPLE_ROWS        = errors.New("Multiple rows found.")
 	BAD_PARAMS           = errors.New("Bad parameters for DAO.")
+	BATTLE_SIMS_DAO      = BattleSimulationsDao{}
 	CP_DAO               = CpDao{}
 	MOVES_DAO            = MovesDao{}
+	MOVE_SETS_DAO        = MoveSetDao{}
 	POKEMON_DAO          = PokemonDao{}
 	POKEMON_HAS_MOVE_DAO = PokemonHasMoveDao{}
 	TYPE_MULTIPLIER_DAO  = TypeMultipliersDao{}

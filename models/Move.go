@@ -6,6 +6,11 @@ import (
 	"strings"
 )
 
+var (
+	SELF     = "Self"
+	OPPONENT = "Opponent"
+)
+
 type Move struct {
 	id              int64
 	name            string
@@ -16,6 +21,86 @@ type Move struct {
 	buffs           map[string]float64
 	buffApplyChance float64
 	buffTarget      string
+}
+
+func (move *Move) Id() int64 {
+	return move.id
+}
+
+func (move *Move) SetId(id int64) {
+	move.id = id
+}
+
+func (move *Move) Name() string {
+	return move.name
+}
+
+func (move *Move) SetName(name string) {
+	move.name = name
+}
+
+func (move *Move) TypeId() int64 {
+	return move.typeId
+}
+
+func (move *Move) SetTypeId(typeId int64) {
+	move.typeId = typeId
+}
+
+func (move *Move) Power() float64 {
+	return move.power
+}
+
+func (move *Move) SetPower(power float64) {
+	move.power = power
+}
+
+func (move *Move) Energy() float64 {
+	return move.energy
+}
+
+func (move *Move) SetEnergy(energy float64) {
+	move.energy = energy
+}
+
+func (move *Move) CoolDown() int64 {
+	return move.coolDown
+}
+
+func (move *Move) SetCoolDown(coolDown int64) {
+	move.coolDown = coolDown
+}
+
+func (move *Move) Buffs() map[string]float64 {
+	return map[string]float64{
+		ATK: move.buffs[ATK],
+		DEF: move.buffs[DEF],
+	}
+}
+
+func (move *Move) SetBuffs(buffs map[string]float64) {
+	move.buffs[ATK] = buffs[ATK]
+	move.buffs[DEF] = buffs[DEF]
+}
+
+func (move *Move) BuffApplyChance() float64 {
+	return move.buffApplyChance
+}
+
+func (move *Move) SetBuffApplyChance(buffApplyChance float64) {
+	move.buffApplyChance = buffApplyChance
+}
+
+func (move *Move) BuffTarget() string {
+	return move.buffTarget
+}
+
+func (move *Move) SetBuffTarget(buffTarget string) {
+	move.buffTarget = buffTarget
+}
+
+func (move *Move) DoesBuff() bool {
+	return move.buffApplyChance == 1
 }
 
 func NewMove(moveDto dtos.MoveDto) *Move {
@@ -32,8 +117,8 @@ func NewMove(moveDto dtos.MoveDto) *Move {
 	move.coolDown = moveDto.Turns()
 	buffs = moveDto.StatsNullable()
 	move.buffs = map[string]float64{
-		"atk": 0,
-		"def": 0,
+		ATK: 0,
+		DEF: 0,
 	}
 	if buffs.Valid {
 		buffTypes = strings.Split(buffs.String, ", ")

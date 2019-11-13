@@ -1,7 +1,6 @@
 package models
 
 import (
-	"PvP-Go/db/dtos"
 	"math"
 	"math/rand"
 	"reflect"
@@ -17,7 +16,7 @@ type Battle struct {
 	previousTurnActions     []Action
 	roundChargeMovesUsed    int64
 	roundChargeMovesStarted int64
-	startingShields         int64
+	startingShields         []int64
 	chargeMoveUsed          bool
 }
 
@@ -28,8 +27,8 @@ func (battle *Battle) Start() {
 	battle.pokemon[0].SetBestMove(battle.pokemon[1])
 	battle.pokemon[1].SetBestMove(battle.pokemon[0])
 
-	battle.pokemon[0].shields = battle.startingShields
-	battle.pokemon[1].shields = battle.startingShields
+	battle.pokemon[0].SetShields(battle.startingShields[0])
+	battle.pokemon[1].SetShields(battle.startingShields[1])
 
 	battle.turns = 1
 	battle.lastProcessedTurn = 0
@@ -41,7 +40,7 @@ func (battle *Battle) Start() {
 }
 
 func (battle *Battle) Step() {
-	battle.DecrementCooldowns()
+	battle.DecrementCoolDowns()
 	battle.RandomizePriority()
 	battle.UpdateQueuedActions()
 
@@ -58,56 +57,53 @@ func (battle *Battle) Step() {
 func (battle *Battle) UpdateTurnActions() {
 	for i := range battle.turnActions {
 		action := battle.turnActions[i]
-		poke := &battle.pokemon[action.actor]
-		opponent := &battle.pokemon[(action.actor+1)%2]
+		poke := &battle.pokemon[action.Actor()]
+		opponent := &battle.pokemon[action.Enemy()]
 		priorityChargeMoveThisTurn := false
 
 		for _, otherAction := range battle.turnActions {
-			if otherAction.actionType == "charge" {
-				if otherAction.priority > 0 {
+			if otherAction.IsCharge() {
+				if otherAction.Priority() > 0 {
 					priorityChargeMoveThisTurn = true
 				}
 			}
 		}
 
-		switch action.actionType {
-		case "fast":
+		if action.IsFast() {
 			action.valid = true
-			if opponent.hp < 1 {
+			if !opponent.IsAlive() {
 				action.valid = false
 			}
-			break
-		case "charge":
-			if poke.energy >= action.move.energy {
-				action.valid = true
+		} else if action.IsCharge() {
+			move := action.Move()
+			if poke.Energy() >= move.Energy() {
+				action.SetValid(true)
 			}
 
-			if poke.hp <= 0 && poke.priority == 0 && priorityChargeMoveThisTurn {
-				action.valid = false
+			if !opponent.IsAlive() && poke.Priority() == 0 && priorityChargeMoveThisTurn {
+				action.SetValid(false)
 			}
 
 			lethalFastMove := false
 			opponentChargeMoveThisTurn := false
 
 			for _, otherAction := range battle.turnActions {
-				if action.actor != otherAction.actor {
-					if otherAction.actionType == "fast" {
-						if (opponent.coolDown == 0 && poke.hp <= CalculateDamage(
-							battle.pokemon[otherAction.actor], battle.pokemon[(otherAction.actor+1)%2], *otherAction.move,
-						)) || poke.hp < 1 {
+				if action.Actor() != otherAction.Actor() {
+					if otherAction.IsFast() {
+						if (opponent.CanAct() && poke.Hp() < CalculateDamage(
+							battle.pokemon[otherAction.Actor()], battle.pokemon[otherAction.Enemy()], otherAction.Move(),
+						)) || !poke.IsAlive() {
 							lethalFastMove = true
 						}
-					} else if otherAction.actionType == "charge" {
+					} else if otherAction.IsCharge() {
 						opponentChargeMoveThisTurn = true
 					}
 				}
 			}
 
 			if lethalFastMove && !opponentChargeMoveThisTurn {
-				action.valid = false
+				action.SetValid(false)
 			}
-
-			break
 		}
 
 		battle.ProcessAction(&action, poke, opponent)
@@ -123,11 +119,11 @@ func (battle *Battle) UpdateQueuedActions() {
 	battle.roundChargeMovesUsed = 0
 	actionsThisTurn := false
 	chargeMoveThisTurn := false
-	coolDownToSet := []int64{battle.pokemon[0].coolDown, battle.pokemon[1].coolDown}
+	coolDownToSet := []int64{battle.pokemon[0].CoolDown(), battle.pokemon[1].CoolDown()}
 	if battle.turns > battle.lastProcessedTurn {
 		battle.turnActions = []Action{}
 		for i := range battle.pokemon {
-			battle.pokemon[i].hasActed = false
+			battle.pokemon[i].SetHasActed(false)
 		}
 
 		for i := range battle.pokemon {
@@ -137,20 +133,20 @@ func (battle *Battle) UpdateQueuedActions() {
 
 			if action != nil {
 				actionsThisTurn = true
-				if action.actionType == "charge" {
+				if action.IsCharge() {
 					chargeMoveThisTurn = true
-				} else if action.actionType == "fast" {
-					coolDownToSet[i] += poke.fastMove.coolDown
+				} else if action.IsFast() {
+					coolDownToSet[i] += poke.fastMove.CoolDown()
 				}
 
-				if poke.hp > 0 && opponent.hp > 0 {
+				if poke.IsAlive() && opponent.IsAlive() {
 					battle.queuedActions = append(battle.queuedActions, *action)
 				}
 			}
 		}
 	}
-	battle.pokemon[0].coolDown = coolDownToSet[0]
-	battle.pokemon[1].coolDown = coolDownToSet[1]
+	battle.pokemon[0].SetCoolDown(coolDownToSet[0])
+	battle.pokemon[1].SetCoolDown(coolDownToSet[1])
 	newQueuedActions := []Action{}
 	for i := range battle.queuedActions {
 		action := battle.queuedActions[i]
@@ -167,36 +163,37 @@ func (battle *Battle) UpdateQueuedActions() {
 
 func (battle *Battle) IsActionValid(action Action, actionsThisTurn bool, chargeMoveThisTurn bool) bool {
 	valid := false
-	if action.actionType == "fast" {
-		turnsSinceActivated := battle.turns - action.turn
+	if action.IsFast() {
+		turnsSinceActivated := battle.turns - action.Turn()
 		chargeMoveLastTurn := false
 		for _, previousAction := range battle.previousTurnActions {
-			chargeMoveLastTurn = chargeMoveLastTurn || previousAction.actionType == "charge"
+			chargeMoveLastTurn = chargeMoveLastTurn || previousAction.IsCharge()
 		}
 
-		requiredTurnsToPass := battle.pokemon[action.actor].fastMove.coolDown - 1
+		actorsFastMove := battle.pokemon[action.Actor()].FastMove()
+		requiredTurnsToPass := actorsFastMove.CoolDown() - 1
 		if turnsSinceActivated >= requiredTurnsToPass {
-			action.priority += 20
+			action.SetPriority(action.Priority() + 20)
 			valid = true
 		}
 		if turnsSinceActivated >= 1 && chargeMoveLastTurn {
-			action.priority += 20
+			action.SetPriority(action.Priority() + 20)
 			valid = true
 		}
 
-		if action.turn == battle.turns {
+		if action.Turn() == battle.turns {
 			chargeMoveLastTurn = false
 			for _, previousAction := range battle.previousTurnActions {
-				chargeMoveLastTurn = chargeMoveLastTurn || previousAction.actionType == "charge"
+				chargeMoveLastTurn = chargeMoveLastTurn || previousAction.IsCharge()
 			}
 
 			if actionsThisTurn {
-				if turnsSinceActivated >= battle.pokemon[action.actor].fastMove.coolDown-1 {
-					action.priority += 20
+				if turnsSinceActivated >= actorsFastMove.CoolDown()-1 {
+					action.SetPriority(action.Priority() + 20)
 					valid = true
 				}
 				if turnsSinceActivated >= 1 && chargeMoveLastTurn {
-					action.priority += 20
+					action.SetPriority(action.Priority() + 20)
 					valid = true
 				}
 			}
@@ -205,9 +202,9 @@ func (battle *Battle) IsActionValid(action Action, actionsThisTurn bool, chargeM
 			fastMoveRegisteredLastTurn := false
 
 			for _, previousAction := range battle.previousTurnActions {
-				if previousAction.actionType == "charge" && action.actor != previousAction.actor {
+				if previousAction.IsCharge() && action.Actor() != previousAction.Actor() {
 					chargeMoveLastTurn = true
-				} else if previousAction.actionType == "fast" && action.actor == previousAction.actor {
+				} else if previousAction.IsFast() && action.Actor() == previousAction.Actor() {
 					fastMoveRegisteredLastTurn = true
 				}
 			}
@@ -216,7 +213,7 @@ func (battle *Battle) IsActionValid(action Action, actionsThisTurn bool, chargeM
 				valid = false
 			}
 		}
-	} else if action.actionType == "charge" {
+	} else if action.IsCharge() {
 		valid = true
 	}
 	return valid
@@ -224,20 +221,17 @@ func (battle *Battle) IsActionValid(action Action, actionsThisTurn bool, chargeM
 
 func (battle *Battle) RandomizePriority() {
 	if rand.Float64() > 0.5 {
-		battle.pokemon[0].priority = 1
-		battle.pokemon[1].priority = 0
+		battle.pokemon[0].SetPriority(1)
+		battle.pokemon[1].SetPriority(0)
 	} else {
-		battle.pokemon[0].priority = 0
-		battle.pokemon[1].priority = 1
+		battle.pokemon[0].SetPriority(0)
+		battle.pokemon[1].SetPriority(1)
 	}
 }
 
-func (battle *Battle) DecrementCooldowns() {
+func (battle *Battle) DecrementCoolDowns() {
 	for i := range battle.pokemon {
-		battle.pokemon[i].coolDown--
-		if battle.pokemon[i].coolDown < 0 {
-			battle.pokemon[i].coolDown = 0
-		}
+		battle.pokemon[i].DecrementCoolDown()
 	}
 }
 
@@ -248,27 +242,27 @@ func (battle *Battle) GetTurnAction(pokeIndex, opponentIndex int) *Action {
 
 	battle.chargeMoveUsed = false
 
-	if poke.coolDown == 0 && !poke.hasActed {
-		poke.hasActed = true
+	if poke.CanAct() && !poke.HasActed() {
+		poke.SetHasActed(true)
 		action = battle.DecideAction(pokeIndex, opponentIndex)
 
 		if action == nil {
-			action = NewAction("fast", pokeIndex, &poke.fastMove, battle.turns, poke.priority)
+			action = NewAction(FAST, pokeIndex, poke.FastMove(), battle.turns, poke.Priority())
 		} else {
-			if action.actionType == "charged" {
+			if action.IsCharge() {
 				battle.roundChargeMovesStarted++
-				if opponent.coolDown > 0 && !opponent.hasActed {
-					action.priority += 4
-					opponent.coolDown = 0
+				if !opponent.CanAct() && !opponent.HasActed() {
+					action.SetPriority(action.Priority() + 4)
+					opponent.SetCoolDown(0)
 
 					opponentAction := battle.GetTurnAction(opponentIndex, pokeIndex)
-					if opponentAction != nil && opponentAction.actionType == "charged" {
+					if opponentAction != nil && opponentAction.IsCharge() {
 						battle.queuedActions = append(battle.queuedActions, *opponentAction)
 					}
 				}
 
-				poke.coolDown = 0
-				action.priority += 10
+				poke.SetCoolDown(0)
+				action.SetPriority(action.Priority() + 10)
 			}
 		}
 	}
@@ -283,18 +277,18 @@ func (battle *Battle) DecideAction(pokeIndex, opponentIndex int) *Action {
 	)
 	poke = &battle.pokemon[pokeIndex]
 	opponent = &battle.pokemon[opponentIndex]
-	pokeFastDamage = CalculateDamage(*poke, *opponent, poke.fastMove)
-	pokeBestChargeDamage = CalculateDamage(*poke, *opponent, *poke.bestChargeMove)
-	opponentFastDamage = CalculateDamage(*opponent, *poke, opponent.fastMove)
+	pokeFastDamage = CalculateDamage(*poke, *opponent, poke.FastMove())
+	pokeBestChargeDamage = CalculateDamage(*poke, *opponent, poke.BestChargeMove())
+	opponentFastDamage = CalculateDamage(*opponent, *poke, opponent.FastMove())
 
 	if battle.ShouldUseBestCharge(poke, opponent, pokeFastDamage, pokeIndex) {
-		return NewAction("charge", pokeIndex, poke.bestChargeMove, battle.turns, poke.priority)
+		return NewAction(CHARGE, pokeIndex, poke.BestChargeMove(), battle.turns, poke.Priority())
 	}
 
 	for i := range poke.chargeMoves {
 		move := &poke.chargeMoves[i]
 		if battle.ShouldUseOtherChargeMove(poke, move, opponent, pokeIndex, pokeFastDamage, opponentFastDamage, pokeBestChargeDamage) {
-			return NewAction("charge", pokeIndex, move, battle.turns, poke.priority)
+			return NewAction(CHARGE, pokeIndex, *move, battle.turns, poke.Priority())
 		}
 	}
 
@@ -302,39 +296,43 @@ func (battle *Battle) DecideAction(pokeIndex, opponentIndex int) *Action {
 }
 
 func (battle *Battle) ShouldUseOtherChargeMove(poke *Pokemon, move *Move, opponent *Pokemon, pokeIndex int, pokeFastDamage float64, opponentFastDamage float64, pokeBestChargeDamage float64) bool {
-	if poke.energy >= -move.energy && !battle.chargeMoveUsed {
+	pokeFastMove := poke.FastMove()
+	opponentFastMove := opponent.FastMove()
+	bestChargeMove := poke.BestChargeMove()
+	if poke.Energy() >= -move.Energy() && !battle.chargeMoveUsed {
 		damage := CalculateDamage(*poke, *opponent, *move)
 
-		if damage >= opponent.hp && !battle.chargeMoveUsed {
+		if damage >= opponent.Hp() && !battle.chargeMoveUsed {
 			battle.chargeMoveUsed = true
 			return true
 		}
 
-		if move.buffApplyChance == 1 && damage/(float64(poke.fastMove.coolDown)*opponent.stats["sta"]) >= 0.25 && opponent.hp > CalculateDamage(*poke, *opponent, *poke.bestChargeMove) {
+		if move.DoesBuff() && damage/(float64(pokeFastMove.CoolDown())*opponent.GetAttack()) >= 0.25 && opponent.Hp() > CalculateDamage(*poke, *opponent, bestChargeMove) {
 			battle.chargeMoveUsed = true
 			return true
 		}
 
-		if opponent.shields > 0 && !battle.chargeMoveUsed && (reflect.DeepEqual(move, poke.bestChargeMove) || poke.energy >= -poke.bestChargeMove.energy) {
-			if opponent.hp > pokeFastDamage && opponent.hp > pokeFastDamage*float64(opponent.fastMove.coolDown)/float64(poke.fastMove.coolDown) {
+		if opponent.HasShields() && !battle.chargeMoveUsed && (reflect.DeepEqual(move, bestChargeMove) || poke.Energy() >= -bestChargeMove.Energy()) {
+			if opponent.Hp() > pokeFastDamage && opponent.Hp() > pokeFastDamage*float64(pokeFastMove.CoolDown())/float64(pokeFastMove.CoolDown()) {
 				battle.chargeMoveUsed = true
 				return true
 			}
 		}
 
-		nearDeath := poke.hp <= opponentFastDamage && float64(opponent.coolDown)/float64(poke.fastMove.coolDown) < 3
-		if poke.shields == 0 {
-			for _, opponentChargeMove := range opponent.chargeMoves {
-				if opponent.energy >= -opponentChargeMove.energy && poke.hp <= CalculateDamage(*opponent, *poke, opponentChargeMove) {
+		nearDeath := poke.Hp() <= opponentFastDamage && float64(opponent.CoolDown())/float64(pokeFastMove.CoolDown()) < 3
+		if !poke.HasShields() {
+			for i := range opponent.ChargeMoves() {
+				opponentChargeMove := opponent.ChargeMoves()[i]
+				if opponent.Energy() >= -opponentChargeMove.Energy() && poke.Hp() <= CalculateDamage(*opponent, *poke, opponentChargeMove) {
 					nearDeath = true
 				}
 			}
 		}
 
-		if !nearDeath && ((((opponent.coolDown > 0) && (opponent.coolDown < poke.fastMove.coolDown)) || ((opponent.coolDown == 0) && (opponent.fastMove.coolDown < poke.fastMove.coolDown))) && (battle.roundChargeMovesUsed == 0)) {
-			availableTurns := float64(poke.fastMove.coolDown - opponent.coolDown)
-			futureActions := math.Ceil(availableTurns / float64(opponent.fastMove.coolDown))
-			if opponent.fastMove.coolDown == 1 {
+		if !nearDeath && (((!opponent.CanAct() && opponent.CoolDown() < pokeFastMove.CoolDown()) || (opponent.CanAct() && opponentFastMove.CoolDown() < pokeFastMove.CoolDown())) && battle.roundChargeMovesUsed == 0) {
+			availableTurns := float64(pokeFastMove.CoolDown() - opponent.CoolDown())
+			futureActions := math.Ceil(availableTurns / float64(opponentFastMove.CoolDown()))
+			if opponentFastMove.CoolDown() == 1 {
 				futureActions++
 			}
 			if battle.roundChargeMovesUsed > 0 || battle.roundChargeMovesStarted > 0 {
@@ -343,32 +341,33 @@ func (battle *Battle) ShouldUseOtherChargeMove(poke *Pokemon, move *Move, oppone
 
 			futureFastDamage := futureActions * opponentFastDamage
 
-			if poke.hp <= futureFastDamage {
+			if poke.Hp() <= futureFastDamage {
 				nearDeath = true
 			}
 
-			if poke.shields == 0 {
-				futureEffectiveEnergy := opponent.energy + opponent.fastMove.energy*(futureActions-1)
-				futureEffectiveHp := poke.hp - ((futureActions - 1) * opponentFastDamage)
+			if !poke.HasShields() {
+				futureEffectiveEnergy := opponent.Energy() + opponentFastMove.Energy()*(futureActions-1)
+				futureEffectiveHp := poke.Hp() - ((futureActions - 1) * opponentFastDamage)
 
-				if opponent.coolDown == 1 {
-					futureEffectiveEnergy += opponent.fastMove.energy
+				if opponent.CoolDown() == 1 {
+					futureEffectiveEnergy += opponentFastMove.Energy()
 				}
 
-				for _, enemyMove := range opponent.chargeMoves {
+				for i := range opponent.ChargeMoves() {
+					enemyMove := opponent.ChargeMoves()[i]
 					enemyMoveDamage := CalculateDamage(*opponent, *poke, enemyMove)
-					if futureEffectiveEnergy >= -enemyMove.energy && futureEffectiveHp <= enemyMoveDamage {
+					if futureEffectiveEnergy >= -enemyMove.Energy() && futureEffectiveHp <= enemyMoveDamage {
 						nearDeath = true
 					}
 				}
 			}
 		}
 
-		if opponent.shields > 0 && opponent.hp <= pokeFastDamage {
+		if opponent.HasShields() && opponent.Hp() <= pokeFastDamage {
 			nearDeath = false
 		}
 
-		if poke.bestChargeMove != nil && poke.energy >= -poke.bestChargeMove.energy && damage < pokeBestChargeDamage {
+		if poke.Energy() >= -bestChargeMove.Energy() && damage < pokeBestChargeDamage {
 			nearDeath = false
 		}
 
@@ -381,10 +380,10 @@ func (battle *Battle) ShouldUseOtherChargeMove(poke *Pokemon, move *Move, oppone
 }
 
 func (battle *Battle) ShouldUseBestCharge(poke *Pokemon, opponent *Pokemon, pokeFastDamage float64, pokeIndex int) bool {
-	if poke.bestChargeMove != nil && poke.energy >= -poke.bestChargeMove.energy {
-		useChargeMove := opponent.hp > pokeFastDamage && (opponent.shields == 0 || opponent.hp > pokeFastDamage*float64(opponent.fastMove.coolDown)/float64(poke.fastMove.coolDown))
+	if poke.energy >= -poke.bestChargeMove.Energy() {
+		useChargeMove := opponent.hp > pokeFastDamage && (opponent.shields == 0 || opponent.hp > pokeFastDamage*float64(opponent.fastMove.CoolDown())/float64(poke.fastMove.CoolDown()))
 		for _, chargeMove := range poke.chargeMoves {
-			if poke.energy >= -chargeMove.energy && (-chargeMove.energy < -poke.bestChargeMove.energy || (poke.bestChargeMove.energy == -chargeMove.energy && chargeMove.buffApplyChance > 0)) {
+			if poke.energy >= -chargeMove.Energy() && (-chargeMove.Energy() < -poke.bestChargeMove.Energy() || (poke.bestChargeMove.Energy() == -chargeMove.Energy() && chargeMove.DoesBuff())) {
 				useChargeMove = useChargeMove && !(opponent.shields > 0 || opponent.hp <= CalculateDamage(*poke, *opponent, chargeMove))
 			}
 		}
@@ -397,65 +396,64 @@ func (battle *Battle) ShouldUseBestCharge(poke *Pokemon, opponent *Pokemon, poke
 }
 
 func (battle *Battle) ProcessAction(action *Action, poke, opponent *Pokemon) {
-	if action == nil || action.valid == false || action.processed {
+	if action == nil || !action.Valid() || action.Processed() {
 		return
 	}
-	action.processed = true
-	switch action.actionType {
-	case "fast":
-		move := poke.fastMove
+	action.SetProcessed(true)
+	if action.IsFast() {
+		move := poke.FastMove()
 		battle.UseMove(poke, opponent, &move)
-		break
-	case "charge":
-		move := action.move
-		if poke.energy >= -move.energy {
-			battle.UseMove(poke, opponent, move)
+	} else if action.IsCharge() {
+		move := action.Move()
+		if poke.Energy() >= -move.Energy() {
+			battle.UseMove(poke, opponent, &move)
 			battle.chargeMoveUsed = true
 			battle.roundChargeMovesUsed++
 		}
-		break
 	}
 }
 
 func (battle *Battle) UseMove(poke, opponent *Pokemon, move *Move) {
 	damage := CalculateDamage(*poke, *opponent, *move)
-	if move.energy < 0 {
-		poke.energy += move.energy
+	pokeFastMove := poke.FastMove()
+	if move.Energy() < 0 {
+		poke.SetEnergy(poke.Energy() + move.Energy())
 
-		if opponent.shields > 0 {
+		if opponent.HasShields() {
 			useShield := true
-			if move.buffApplyChance == 1 && (move.buffs["atk"] > 0 || move.buffs["def"] < 0) {
+			if move.DoesBuff() && (move.Buffs()[ATK] > 0 || move.Buffs()[DEF] < 0) {
 				useShield = false
-				postMoveHp := opponent.hp - damage
+				postMoveHp := opponent.Hp() - damage
 				var currentBuffs = map[string]float64{}
-				if move.buffTarget == dtos.BUFF_SELF {
-					currentBuffs["atk"] = poke.statBuffs["atk"]
-					currentBuffs["def"] = poke.statBuffs["def"]
-					poke.ApplyStatBuffs(move.buffs)
-				} else if move.buffTarget == dtos.DEBUFF_ENEMY {
-					currentBuffs["atk"] = opponent.statBuffs["atk"]
-					currentBuffs["def"] = opponent.statBuffs["def"]
-					opponent.ApplyStatBuffs(move.buffs)
+				if move.BuffTarget() == SELF {
+					currentBuffs[ATK] = poke.StatBuffs()[ATK]
+					currentBuffs[DEF] = poke.StatBuffs()[DEF]
+					poke.ApplyStatBuffs(move.Buffs())
+				} else if move.BuffTarget() == OPPONENT {
+					currentBuffs[ATK] = opponent.StatBuffs()[ATK]
+					currentBuffs[DEF] = opponent.StatBuffs()[DEF]
+					opponent.ApplyStatBuffs(move.Buffs())
 				}
-				fastDamage := CalculateDamage(*poke, *opponent, poke.fastMove)
-				fastAttackCount := math.Ceil(math.Max(-move.energy-poke.energy, 0)/poke.fastMove.energy) + 2
+				fastDamage := CalculateDamage(*poke, *opponent, pokeFastMove)
+				fastAttackCount := math.Ceil(math.Max(-(move.Energy()+poke.Energy()), 0)/pokeFastMove.Energy()) + 2
 				fastAttackDamage := fastAttackCount * fastDamage
-				cycleDamage := (fastAttackDamage + 1) * float64(opponent.shields)
+				cycleDamage := (fastAttackDamage + 1) * float64(opponent.Shields())
 
 				if postMoveHp <= cycleDamage {
 					useShield = true
 				}
 
-				if move.buffTarget == dtos.BUFF_SELF {
-					poke.statBuffs = currentBuffs
-				} else if move.buffTarget == dtos.DEBUFF_ENEMY {
-					opponent.statBuffs = currentBuffs
+				if move.BuffTarget() == SELF {
+					poke.SetStatBuffs(currentBuffs)
+				} else if move.BuffTarget() == OPPONENT {
+					opponent.SetStatBuffs(currentBuffs)
 				}
 
-				for _, chargeMove := range poke.chargeMoves {
-					if poke.energy >= -chargeMove.energy {
+				for i := range poke.ChargeMoves() {
+					chargeMove := poke.ChargeMoves()[i]
+					if poke.Energy() >= -chargeMove.Energy() {
 						chargeDamage := CalculateDamage(*poke, *opponent, chargeMove)
-						if chargeDamage >= opponent.hp {
+						if chargeDamage >= opponent.Hp() {
 							useShield = true
 						}
 					}
@@ -464,23 +462,20 @@ func (battle *Battle) UseMove(poke, opponent *Pokemon, move *Move) {
 
 			if useShield {
 				damage = 1
-				opponent.shields--
+				opponent.SetShields(opponent.Shields() - 1)
 			}
 		}
 	} else {
-		poke.energy += move.energy
-		if poke.energy > 100 {
-			poke.energy = 100
-		}
+		poke.SetEnergy(poke.Energy() + move.Energy())
 	}
 
-	opponent.hp = math.Max(0, opponent.hp-damage)
+	opponent.SetHp(opponent.Hp() - damage)
 
-	if move.buffApplyChance == 1 {
-		if move.buffTarget == dtos.BUFF_SELF {
-			poke.ApplyStatBuffs(move.buffs)
-		} else if move.buffTarget == dtos.DEBUFF_ENEMY {
-			opponent.ApplyStatBuffs(move.buffs)
+	if move.DoesBuff() {
+		if move.BuffTarget() == SELF {
+			poke.ApplyStatBuffs(move.Buffs())
+		} else if move.BuffTarget() == OPPONENT {
+			opponent.ApplyStatBuffs(move.Buffs())
 		}
 	}
 }
@@ -490,7 +485,7 @@ func (battle *Battle) Simulate() (int64, int64) {
 	continueBattle := true
 	for continueBattle {
 		battle.Step()
-		continueBattle = battle.pokemon[0].hp > 0 && battle.pokemon[1].hp > 0
+		continueBattle = battle.pokemon[0].IsAlive() && battle.pokemon[1].IsAlive()
 	}
 	return battle.GetBattleRating()
 }
@@ -506,35 +501,44 @@ func (battle *Battle) GetBattleRating() (int64, int64) {
 		totalScores      []float64
 		sum              float64
 	)
-	healthScores = append(healthScores, healthMultiplier-healthMultiplier*battle.pokemon[1].hp/battle.pokemon[1].maxHp,
-		healthMultiplier-healthMultiplier*battle.pokemon[0].hp/battle.pokemon[0].maxHp)
+
+	healthScores = []float64{
+		healthMultiplier - healthMultiplier*battle.pokemon[1].Hp()/battle.pokemon[1].MaxHp(),
+		healthMultiplier - healthMultiplier*battle.pokemon[0].Hp()/battle.pokemon[0].MaxHp(),
+	}
+
+	energyScores = []float64{0, 0}
 	for i := range battle.pokemon {
-		if battle.pokemon[i].hp > 0 {
-			energyScores = append(energyScores, energyMultiplier*battle.pokemon[i].energy/-battle.pokemon[i].bestChargeMove.energy)
-		} else {
-			energyScores = append(energyScores, 0)
+		if battle.pokemon[i].IsAlive() {
+			bestChargeMove := battle.pokemon[i].BestChargeMove()
+			energyScores[i] = energyMultiplier * battle.pokemon[i].Energy() / -bestChargeMove.Energy()
 		}
 	}
-	if battle.startingShields > 0 {
-		shieldScores = append(shieldScores, shieldMultiplier-shieldMultiplier*float64(battle.pokemon[1].shields)/float64(battle.startingShields),
-			shieldMultiplier-shieldMultiplier*float64(battle.pokemon[0].shields)/float64(battle.startingShields))
-	} else {
-		shieldScores = append(shieldScores, 0, 0)
+
+	shieldScores = []float64{0, 0}
+	for i := range battle.pokemon {
+		if battle.startingShields[i] > 0 {
+			shieldScores[(i+1)%2] = shieldMultiplier - shieldMultiplier*float64(battle.pokemon[i].Shields())/float64(battle.startingShields[i])
+		}
 	}
-	totalScores = []float64{healthScores[0] + energyScores[0] + shieldScores[0],
-		healthScores[1] + energyScores[1] + shieldScores[1]}
+
+	totalScores = []float64{
+		healthScores[0] + energyScores[0] + shieldScores[0],
+		healthScores[1] + energyScores[1] + shieldScores[1],
+	}
+
 	sum = totalScores[0] + totalScores[1]
 	return int64(math.Round(1000.0 * totalScores[0] / sum)), int64(math.Round(1000.0 * totalScores[1] / sum))
 }
 
-func NewBattle(pokemon []Pokemon, startingShields int64) *Battle {
+func NewBattle(pokemon []Pokemon, startingShields []int64) *Battle {
 	var battle = Battle{}
 	battle.pokemon = pokemon
 	battle.turns = 0
 	battle.lastProcessedTurn = 0
 	battle.startingShields = startingShields
 	for i := range battle.pokemon {
-		battle.pokemon[i].shields = startingShields
+		battle.pokemon[i].SetShields(startingShields[i])
 	}
 	battle.queuedActions = []Action{}
 	battle.turnActions = []Action{}
@@ -547,7 +551,26 @@ func NewBattle(pokemon []Pokemon, startingShields int64) *Battle {
 func CalculateDamage(attacker, defender Pokemon, move Move) float64 {
 	var (
 		bonusMultiplier    = 1.3
-		efficacyMultiplier = defender.GetEfficacy(move.typeId)
+		efficacyMultiplier = defender.GetEfficacy(move.TypeId())
 	)
-	return math.Floor(move.power*attacker.GetStab(&move)*(attacker.GetAttack()/defender.GetDefense())*efficacyMultiplier*0.5*bonusMultiplier) + 1
+	return math.Floor(move.Power()*attacker.GetStab(&move)*(attacker.GetAttack()/defender.GetDefense())*efficacyMultiplier*0.5*bonusMultiplier) + 1
+}
+
+func DoAllBattles(pokemon []Pokemon) [][]int64 {
+	var (
+		allResults            = [][]int64{}
+		allyShield            int64
+		enemyShield           int64
+		allyScore, enemyScore int64
+		battle                Battle
+	)
+	allResults = [][]int64{}
+	for allyShield = 0; allyShield < 3; allyShield++ {
+		for enemyShield = 0; enemyShield < 3; enemyShield++ {
+			battle = *NewBattle(pokemon, []int64{allyShield, enemyShield})
+			allyScore, enemyScore = battle.Simulate()
+			allResults = append(allResults, []int64{allyScore, enemyScore})
+		}
+	}
+	return allResults
 }

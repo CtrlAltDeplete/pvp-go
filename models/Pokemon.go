@@ -6,10 +6,14 @@ import (
 	"math"
 )
 
+var (
+	ATK = "atk"
+	DEF = "def"
+	STA = "sta"
+)
+
 type Pokemon struct {
 	name           string
-	baseStats      map[string]float64
-	ivs            map[string]float64
 	stats          map[string]float64
 	statBuffs      map[string]float64
 	typeIds        []int64
@@ -21,97 +25,258 @@ type Pokemon struct {
 	fastMove       Move
 	chargeMoves    []Move
 	typeEfficacy   map[int64]float64
-	dps            float64
 	energy         float64
 	coolDown       int64
 	shields        int64
 	hasActed       bool
-	baitShields    bool
-	farmEnergy     bool
-	bestChargeMove *Move
+	bestChargeMove Move
 }
 
-func (pokemon *Pokemon) MaximizeStats() {
+func (pokemon *Pokemon) Name() string {
+	return pokemon.name
+}
+
+func (pokemon *Pokemon) SetName(name string) {
+	pokemon.name = name
+}
+
+func (pokemon *Pokemon) Stats() map[string]float64 {
+	return map[string]float64{
+		ATK: pokemon.stats[ATK],
+		DEF: pokemon.stats[DEF],
+		STA: pokemon.stats[STA],
+	}
+}
+
+func (pokemon *Pokemon) SetStats(stats map[string]float64) {
+	pokemon.stats[ATK] = stats[ATK]
+	pokemon.stats[DEF] = stats[DEF]
+	pokemon.stats[STA] = stats[STA]
+	pokemon.maxHp = stats[STA]
+}
+
+func (pokemon *Pokemon) StatBuffs() map[string]float64 {
+	return map[string]float64{
+		ATK: pokemon.statBuffs[ATK],
+		DEF: pokemon.statBuffs[DEF],
+	}
+}
+
+func (pokemon *Pokemon) SetStatBuffs(statBuffs map[string]float64) {
+	pokemon.statBuffs[ATK] = statBuffs[ATK]
+	pokemon.statBuffs[DEF] = statBuffs[DEF]
+}
+
+func (pokemon *Pokemon) TypeIds() []int64 {
+	return pokemon.typeIds
+}
+
+func (pokemon *Pokemon) SetTypeIds(typeIds []int64) {
+	pokemon.typeIds = typeIds
+}
+
+func (pokemon *Pokemon) Cp() float64 {
+	return pokemon.cp
+}
+
+func (pokemon *Pokemon) SetCp(cp float64) {
+	pokemon.cp = cp
+}
+
+func (pokemon *Pokemon) MaxHp() float64 {
+	return pokemon.maxHp
+}
+
+func (pokemon *Pokemon) SetMaxHp(maxHp float64) {
+	pokemon.maxHp = maxHp
+}
+
+func (pokemon *Pokemon) Hp() float64 {
+	return pokemon.hp
+}
+
+func (pokemon *Pokemon) IsAlive() bool {
+	return pokemon.hp > 0
+}
+
+func (pokemon *Pokemon) SetHp(hp float64) {
+	pokemon.hp = hp
+	if pokemon.hp < 0 {
+		pokemon.hp = 0
+	}
+}
+
+func (pokemon *Pokemon) Level() float64 {
+	return pokemon.level
+}
+
+func (pokemon *Pokemon) SetLevel(level float64) {
+	pokemon.level = level
+}
+
+func (pokemon *Pokemon) Priority() int64 {
+	return pokemon.priority
+}
+
+func (pokemon *Pokemon) SetPriority(priority int64) {
+	pokemon.priority = priority
+}
+
+func (pokemon *Pokemon) FastMove() Move {
+	return pokemon.fastMove
+}
+
+func (pokemon *Pokemon) SetFastMove(fastMove Move) {
+	pokemon.fastMove = fastMove
+}
+
+func (pokemon *Pokemon) ChargeMoves() []Move {
+	return pokemon.chargeMoves
+}
+
+func (pokemon *Pokemon) SetChargeMoves(chargeMoves []Move) {
+	pokemon.chargeMoves = chargeMoves
+}
+
+func (pokemon *Pokemon) Energy() float64 {
+	return pokemon.energy
+}
+
+func (pokemon *Pokemon) SetEnergy(energy float64) {
+	pokemon.energy = energy
+	if pokemon.energy > 100 {
+		pokemon.energy = 100
+	}
+}
+
+func (pokemon *Pokemon) CoolDown() int64 {
+	return pokemon.coolDown
+}
+
+func (pokemon *Pokemon) CanAct() bool {
+	return pokemon.coolDown == 0
+}
+
+func (pokemon *Pokemon) SetCoolDown(coolDown int64) {
+	pokemon.coolDown = coolDown
+}
+
+func (pokemon *Pokemon) DecrementCoolDown() {
+	pokemon.coolDown--
+	if pokemon.coolDown < 0 {
+		pokemon.coolDown = 0
+	}
+}
+
+func (pokemon *Pokemon) Shields() int64 {
+	return pokemon.shields
+}
+
+func (pokemon *Pokemon) HasShields() bool {
+	return pokemon.shields > 0
+}
+
+func (pokemon *Pokemon) SetShields(shields int64) {
+	pokemon.shields = shields
+}
+
+func (pokemon *Pokemon) HasActed() bool {
+	return pokemon.hasActed
+}
+
+func (pokemon *Pokemon) SetHasActed(hasActed bool) {
+	pokemon.hasActed = hasActed
+}
+
+func (pokemon *Pokemon) BestChargeMove() Move {
+	return pokemon.bestChargeMove
+}
+
+func (pokemon *Pokemon) SetBestChargeMove(bestChargeMove Move) {
+	pokemon.bestChargeMove = bestChargeMove
+}
+
+func (pokemon *Pokemon) MaximizeStats(baseStats map[string]float64) map[string]float64 {
 	var (
 		cpms                                       = map[float64]float64{}
 		level, atk, def, sta, cp, score, bestScore float64
-		ivs, stats                                 map[string]float64
+		ivs, bestIvs, stats                        map[string]float64
 	)
 	for _, cpDto := range daos.CP_DAO.FindAll() {
 		cpms[cpDto.Level()] = cpDto.Multiplier()
 	}
-	pokemon.ivs = map[string]float64{}
 	pokemon.stats = map[string]float64{}
 	shouldContinue := func(ivs map[string]float64, level float64) bool {
-		cp, _, score := CalculateCp(pokemon.baseStats, ivs, cpms[level])
+		cp, _, score := CalculateCp(baseStats, ivs, cpms[level])
 		return cp < 1480 || score <= bestScore
 	}
 	shouldBreak := func(ivs map[string]float64, level float64) bool {
-		cp, _, _ := CalculateCp(pokemon.baseStats, ivs, cpms[level])
+		cp, _, _ := CalculateCp(baseStats, ivs, cpms[level])
 		return cp > 1500
 	}
 	bestScore = 0
 	ivs = map[string]float64{}
+	bestIvs = map[string]float64{}
 	for level = 1.0; level <= 40.0; level += 0.5 {
-		ivs["atk"] = 0
-		ivs["def"] = 0
-		ivs["sta"] = 0
+		ivs[ATK] = 0
+		ivs[DEF] = 0
+		ivs[STA] = 0
 		if shouldBreak(ivs, level) {
 			break
 		}
 
-		ivs["atk"] = 15
-		ivs["def"] = 15
-		ivs["sta"] = 15
+		ivs[ATK] = 15
+		ivs[DEF] = 15
+		ivs[STA] = 15
 		if level < 40.0 && shouldContinue(ivs, level) {
 			continue
 		}
 		for atk = 0.0; atk <= 15.0; atk++ {
-			ivs["atk"] = atk
-			ivs["def"] = 0
-			ivs["sta"] = 0
+			ivs[ATK] = atk
+			ivs[DEF] = 0
+			ivs[STA] = 0
 			if shouldBreak(ivs, level) {
 				break
 			}
 
-			ivs["atk"] = atk
-			ivs["def"] = 15
-			ivs["sta"] = 15
+			ivs[ATK] = atk
+			ivs[DEF] = 15
+			ivs[STA] = 15
 			if atk < 15 && shouldContinue(ivs, level) {
 				continue
 			}
 			for def = 0.0; def <= 15.0; def++ {
-				ivs["atk"] = atk
-				ivs["def"] = def
-				ivs["sta"] = 0
+				ivs[ATK] = atk
+				ivs[DEF] = def
+				ivs[STA] = 0
 				if shouldBreak(ivs, level) {
 					break
 				}
 
-				ivs["atk"] = atk
-				ivs["def"] = def
-				ivs["sta"] = 15
+				ivs[ATK] = atk
+				ivs[DEF] = def
+				ivs[STA] = 15
 				if def < 15 && shouldContinue(ivs, level) {
 					continue
 				}
 				for sta = 0.0; sta <= 15.0; sta++ {
-					ivs["atk"] = atk
-					ivs["def"] = def
-					ivs["sta"] = sta
-					cp, stats, score = CalculateCp(pokemon.baseStats, ivs, cpms[level])
+					ivs[ATK] = atk
+					ivs[DEF] = def
+					ivs[STA] = sta
+					cp, stats, score = CalculateCp(baseStats, ivs, cpms[level])
 
 					if cp > 1500 {
 						break
 					}
 
 					if bestScore < score {
-						pokemon.ivs["atk"] = ivs["atk"]
-						pokemon.ivs["def"] = ivs["def"]
-						pokemon.ivs["sta"] = ivs["sta"]
+						bestIvs[ATK] = ivs[ATK]
+						bestIvs[DEF] = ivs[DEF]
+						bestIvs[STA] = ivs[STA]
 						pokemon.level = level
-						pokemon.stats["atk"] = stats["atk"]
-						pokemon.stats["def"] = stats["def"]
-						pokemon.stats["sta"] = stats["sta"]
+						pokemon.stats[ATK] = stats[ATK]
+						pokemon.stats[DEF] = stats[DEF]
+						pokemon.stats[STA] = stats[STA]
 						pokemon.cp = cp
 						bestScore = score
 					}
@@ -119,11 +284,12 @@ func (pokemon *Pokemon) MaximizeStats() {
 			}
 		}
 	}
+	return bestIvs
 }
 
 func (pokemon *Pokemon) GetStab(move *Move) float64 {
 	for _, id := range pokemon.typeIds {
-		if id == move.typeId {
+		if id == move.TypeId() {
 			return 1.2
 		}
 	}
@@ -143,25 +309,25 @@ func (pokemon *Pokemon) Reset() {
 	pokemon.coolDown = 0
 	pokemon.shields = 0
 	pokemon.statBuffs = map[string]float64{
-		"atk": 0,
-		"def": 0,
+		ATK: 0,
+		DEF: 0,
 	}
 }
 
 func (pokemon *Pokemon) ApplyStatBuffs(buffStages map[string]float64) {
 	var maxBuffStages = 4.0
-	pokemon.statBuffs["atk"] += buffStages["atk"]
-	pokemon.statBuffs["atk"] = math.Min(maxBuffStages, math.Max(-maxBuffStages, pokemon.statBuffs["atk"]))
-	pokemon.statBuffs["def"] += buffStages["def"]
-	pokemon.statBuffs["def"] = math.Min(maxBuffStages, math.Max(-maxBuffStages, pokemon.statBuffs["def"]))
+	pokemon.statBuffs[ATK] += buffStages[ATK]
+	pokemon.statBuffs[ATK] = math.Min(maxBuffStages, math.Max(-maxBuffStages, pokemon.statBuffs[ATK]))
+	pokemon.statBuffs[DEF] += buffStages[DEF]
+	pokemon.statBuffs[DEF] = math.Min(maxBuffStages, math.Max(-maxBuffStages, pokemon.statBuffs[DEF]))
 }
 
 func (pokemon *Pokemon) GetAttack() float64 {
-	return pokemon.GetStat(pokemon.stats["atk"], pokemon.statBuffs["atk"])
+	return pokemon.GetStat(pokemon.stats[ATK], pokemon.statBuffs[ATK])
 }
 
 func (pokemon *Pokemon) GetDefense() float64 {
-	return pokemon.GetStat(pokemon.stats["def"], pokemon.statBuffs["def"])
+	return pokemon.GetStat(pokemon.stats[DEF], pokemon.statBuffs[DEF])
 }
 
 func (pokemon *Pokemon) GetStat(stat, buff float64) float64 {
@@ -184,10 +350,10 @@ func (pokemon *Pokemon) SetBestMove(enemy Pokemon) {
 	for i := range pokemon.chargeMoves {
 		chargeMove := pokemon.chargeMoves[i]
 		damage := CalculateDamage(*pokemon, enemy, chargeMove)
-		if damage > bestDamage || (damage == bestDamage && bestEnergy > -chargeMove.energy) {
+		if damage > bestDamage || (damage == bestDamage && bestEnergy > -chargeMove.Energy()) {
 			bestDamage = damage
-			bestEnergy = -chargeMove.energy
-			pokemon.bestChargeMove = &chargeMove
+			bestEnergy = -chargeMove.Energy()
+			pokemon.bestChargeMove = chargeMove
 		}
 	}
 }
@@ -203,10 +369,6 @@ func NewPokemon(pokemonDto dtos.PokemonDto, fastMoveDto dtos.MoveDto, chargeMove
 	)
 
 	p.name = pokemonDto.Name()
-	p.baseStats = map[string]float64{}
-	p.baseStats["atk"] = pokemonDto.Atk()
-	p.baseStats["def"] = pokemonDto.Def()
-	p.baseStats["sta"] = pokemonDto.Sta()
 	p.statBuffs = map[string]float64{}
 
 	p.typeIds = []int64{}
@@ -243,34 +405,36 @@ func NewPokemon(pokemonDto dtos.PokemonDto, fastMoveDto dtos.MoveDto, chargeMove
 		p.typeEfficacy[dto.ActingType()] = dto.Multiplier()
 	}
 
-	p.dps = 0
 	p.energy = 0
 	p.coolDown = 0
 	p.shields = 0
 	p.hasActed = false
-	p.baitShields = false
-	p.farmEnergy = false
-	p.bestChargeMove = nil
 
+	baseStats := map[string]float64{
+		ATK: pokemonDto.Atk(),
+		DEF: pokemonDto.Def(),
+		STA: pokemonDto.Sta(),
+	}
+	var ivs map[string]float64
 	if pokemonDto.OptLevel() <= 1 {
-		p.MaximizeStats()
-		pokemonDto.SetOptAtk(p.ivs["atk"])
-		pokemonDto.SetOptDef(p.ivs["def"])
-		pokemonDto.SetOptSta(p.ivs["sta"])
+		ivs = p.MaximizeStats(baseStats)
+		pokemonDto.SetOptAtk(ivs[ATK])
+		pokemonDto.SetOptDef(ivs[DEF])
+		pokemonDto.SetOptSta(ivs[STA])
 		pokemonDto.SetOptLevel(p.level)
 		daos.POKEMON_DAO.Update(pokemonDto)
 	} else {
-		p.ivs = map[string]float64{
-			"atk": pokemonDto.OptAtk(),
-			"def": pokemonDto.OptDef(),
-			"sta": pokemonDto.OptSta(),
+		ivs := map[string]float64{
+			ATK: pokemonDto.OptAtk(),
+			DEF: pokemonDto.OptDef(),
+			STA: pokemonDto.OptSta(),
 		}
 		p.level = pokemonDto.OptLevel()
 		err, cpmDto := daos.CP_DAO.FindByLevel(p.level)
 		daos.CheckError(err)
-		p.cp, p.stats, _ = CalculateCp(p.baseStats, p.ivs, cpmDto.Multiplier())
+		p.cp, p.stats, _ = CalculateCp(baseStats, ivs, cpmDto.Multiplier())
 	}
-	p.maxHp = p.stats["sta"]
+	p.maxHp = p.stats[STA]
 
 	return &p
 }
@@ -280,14 +444,14 @@ func CalculateCp(baseStats, ivs map[string]float64, cpm float64) (
 	var (
 		atk, def, sta float64
 	)
-	atk = cpm * (baseStats["atk"] + ivs["atk"])
-	def = cpm * (baseStats["def"] + ivs["def"])
-	sta = cpm * (baseStats["sta"] + ivs["sta"])
+	atk = cpm * (baseStats[ATK] + ivs[ATK])
+	def = cpm * (baseStats[DEF] + ivs[DEF])
+	sta = cpm * (baseStats[STA] + ivs[STA])
 
 	stats = map[string]float64{}
-	stats["atk"] = atk
-	stats["def"] = def
-	stats["sta"] = math.Floor(sta)
+	stats[ATK] = atk
+	stats[DEF] = def
+	stats[STA] = math.Floor(sta)
 	cp = math.Floor(atk * math.Pow(def, 0.5) * math.Pow(sta, 0.5) / 10)
 	score = atk * def * math.Floor(sta)
 	return

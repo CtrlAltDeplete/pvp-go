@@ -38,7 +38,7 @@ func TestBattle_BulbasaurVsSquirtle(t *testing.T) {
 	bulbasaur = *NewPokemon(*bulbasaurDto, *vineWhipDto, []dtos.MoveDto{*powerWhipDto, *sludgeBombDto})
 	squirtle = *NewPokemon(*squirtleDto, *bubbleDto, []dtos.MoveDto{*aquaJetDto, *returnDto})
 
-	battle = *NewBattle([]Pokemon{bulbasaur, squirtle}, startingShields)
+	battle = *NewBattle([]Pokemon{bulbasaur, squirtle}, []int64{startingShields, startingShields})
 	bulbasaurScore, squirtleScore = battle.Simulate()
 	if battle.pokemon[0].hp != 51 || battle.pokemon[1].hp != 0 {
 		fmt.Printf("Expected Bulbasaur %d hp, Squirtle %d hp; got Bulbasaur %d hp, Squirtle %d hp\n",
@@ -76,7 +76,7 @@ func TestBattle_MedichamVsSkarmory(t *testing.T) {
 	medicham = *NewPokemon(*medichamDto, *counterDto, []dtos.MoveDto{*powerUpPunchDto})
 	skarmory = *NewPokemon(*skarmoryDto, *airSlashDto, []dtos.MoveDto{*skyAttackDto})
 
-	battle = *NewBattle([]Pokemon{medicham, skarmory}, startingShields)
+	battle = *NewBattle([]Pokemon{medicham, skarmory}, []int64{startingShields, startingShields})
 	medichamScore, skarmoryScore = battle.Simulate()
 	if battle.pokemon[0].hp != 6 || battle.pokemon[1].hp != 0 {
 		fmt.Printf("Expected Medicham %d hp, Skarmory %d hp; got Medicham %d hp, Skarmory %d hp\n",
@@ -114,9 +114,9 @@ func TestBattle_QuagsireVsOmastar(t *testing.T) {
 	quagsire = *NewPokemon(*quagsireDto, *mudShotDto, []dtos.MoveDto{*acidSprayDto})
 	omastar = *NewPokemon(*omastarDto, *rockThrowDto, []dtos.MoveDto{*hydroPumpDto})
 
-	battle = *NewBattle([]Pokemon{quagsire, omastar}, startingShields)
+	battle = *NewBattle([]Pokemon{quagsire, omastar}, []int64{startingShields, startingShields})
 	quagsireScore, omastarScore = battle.Simulate()
-	if battle.pokemon[0].hp != 64 || battle.pokemon[1].hp != 0 {
+	if battle.pokemon[0].hp != 69 || battle.pokemon[1].hp != 0 {
 		fmt.Printf("Expected Quagsire %d hp, Omastar %d hp; got Quagsire %d hp, Omastar %d hp\n",
 			64, 0, int(battle.pokemon[0].hp), int(battle.pokemon[1].hp))
 		t.Fail()
