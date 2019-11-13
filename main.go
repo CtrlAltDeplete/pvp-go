@@ -6,7 +6,9 @@ import (
 	"PvP-Go/models"
 	"fmt"
 	"log"
+	"math"
 	"sync"
+	"time"
 )
 
 var (
@@ -17,6 +19,7 @@ var (
 	allMoves    map[int64]dtos.MoveDto
 	allPokemon  map[int64]dtos.PokemonDto
 	allMovesets []dtos.MoveSetDto
+	startTime   time.Time
 )
 
 func worker(jobs <-chan int) {
@@ -63,13 +66,16 @@ func worker(jobs <-chan int) {
 				}
 			}
 			finished++
-			if int(finished)%1000 == 0 {
-				fmt.Printf("%d%% Finished\n", int(finished*100.0/(total*total)))
+			if int(finished)%100000 < 2 && finished > 2 {
+				finishedPerSecond := finished / time.Since(startTime).Seconds()
+				secondsLeft := time.Duration((total*total-finished)*finishedPerSecond) * time.Second
+				eta := time.Now().Add(secondsLeft).Format("RFC3339")
+				fmt.Printf("%f%% Finished:\tETA %s\n", math.Round(finished*1000.0/(total*total))/10.0, eta)
 			}
-			waitGroup.Done()
 			mutex.Unlock()
 			j++
 		}
+		waitGroup.Done()
 	}
 }
 
@@ -87,17 +93,18 @@ func main() {
 	}
 
 	fmt.Println("Gathering move sets...")
-	allMovesets = daos.MOVE_SETS_DAO.FindAll()
+	allMovesets = daos.MOVE_SETS_DAO.FindAll()[0:3]
 
 	fmt.Println("Preparing workers...")
 	total = float64(len(allMovesets))
 	jobs := make(chan int, int(total))
 
-	for w := 0; w < 4; w++ {
+	for w := 0; w < 1; w++ {
 		go worker(jobs)
 	}
 
 	fmt.Println("Starting work...")
+	startTime = time.Now()
 	for i := range allMovesets {
 		waitGroup.Add(1)
 		jobs <- i
