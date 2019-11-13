@@ -93,13 +93,13 @@ func main() {
 	}
 
 	fmt.Println("Gathering move sets...")
-	allMovesets = daos.MOVE_SETS_DAO.FindAll()[0:3]
+	allMovesets = daos.MOVE_SETS_DAO.FindAll()
 
 	fmt.Println("Preparing workers...")
 	total = float64(len(allMovesets))
 	jobs := make(chan int, int(total))
 
-	for w := 0; w < 1; w++ {
+	for w := 0; w < 5; w++ {
 		go worker(jobs)
 	}
 
