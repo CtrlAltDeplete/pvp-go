@@ -3,8 +3,10 @@ package daos
 import (
 	"PvP-Go/db/dtos"
 	"database/sql"
+	"encoding/gob"
 	"fmt"
-	"log"
+	"os"
+	"time"
 )
 
 type BattleSimulationsDao struct{}
@@ -76,7 +78,9 @@ func (dao *BattleSimulationsDao) BatchCreate(params []int64) {
 	}
 	_, err = LIVE.Exec(query)
 	if err != nil {
-		log.Printf("Battle Sims Failed: %v\n", params)
+		file, _ := os.Create(fmt.Sprintf("%s - error.log", time.Now()))
+		encode := gob.NewEncoder(file)
+		_ = encode.Encode(params)
 	}
 }
 
