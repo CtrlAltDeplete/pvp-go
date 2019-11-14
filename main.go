@@ -5,8 +5,6 @@ import (
 	"PvP-Go/db/dtos"
 	"PvP-Go/models"
 	"fmt"
-	"log"
-	"math"
 	"sync"
 	"time"
 )
@@ -20,7 +18,29 @@ var (
 	allPokemon  map[int64]dtos.PokemonDto
 	allMovesets []dtos.MoveSetDto
 	startTime   time.Time
+	batchParams []int64
 )
+
+func addToBatch(allyId, enemyId int64, allyResults []int64) {
+	batchParams = append(batchParams, allyId, enemyId)
+	batchParams = append(batchParams, allyResults...)
+	if len(batchParams) >= int(total*total*11/1000) {
+		var oldParams = make([]int64, len(batchParams))
+		copy(oldParams, batchParams)
+		batchParams = []int64{}
+
+		ratio := finished / (total * total)
+		past := float64(time.Now().Sub(startTime))
+		totalTime := time.Duration(past / ratio)
+		eta := startTime.Add(totalTime)
+		fmt.Printf("%f%% Finished:\tETA %s\n", finished*100.0/(total*total), eta)
+		waitGroup.Add(1)
+		go func() {
+			daos.BATTLE_SIMS_DAO.BatchCreate(oldParams)
+			waitGroup.Done()
+		}()
+	}
+}
 
 func worker(jobs <-chan int) {
 	for i := range jobs {
@@ -53,24 +73,11 @@ func worker(jobs <-chan int) {
 			}
 
 			mutex.Lock()
-			err, _ := daos.BATTLE_SIMS_DAO.Create(allyMovesetDto.Id(), enemyMovesetDto.Id(), allyResults)
-			if err != nil {
-				log.Printf("Battle Simulation Failed on (%d, %d): %s\n", allyMovesetDto.Id(), enemyMovesetDto.Id(), err.Error())
-			}
 			finished++
-
+			addToBatch(allyMovesetDto.Id(), enemyMovesetDto.Id(), allyResults)
 			if allyMovesetDto.Id() != enemyMovesetDto.Id() {
-				err, _ := daos.BATTLE_SIMS_DAO.Create(enemyMovesetDto.Id(), allyMovesetDto.Id(), enemyResults)
-				if err != nil {
-					log.Printf("Battle Simulation Failed on (%d, %d): %s\n", enemyMovesetDto.Id(), allyMovesetDto.Id(), err.Error())
-				}
-			}
-			finished++
-			if int(finished)%100000 < 2 && finished > 2 {
-				finishedPerSecond := finished / time.Since(startTime).Seconds()
-				secondsLeft := time.Duration((total*total-finished)*finishedPerSecond) * time.Second
-				eta := time.Now().Add(secondsLeft).Format("RFC3339")
-				fmt.Printf("%f%% Finished:\tETA %s\n", math.Round(finished*1000.0/(total*total))/10.0, eta)
+				finished++
+				addToBatch(enemyMovesetDto.Id(), allyMovesetDto.Id(), enemyResults)
 			}
 			mutex.Unlock()
 			j++
@@ -99,7 +106,7 @@ func main() {
 	total = float64(len(allMovesets))
 	jobs := make(chan int, int(total))
 
-	for w := 0; w < 5; w++ {
+	for w := 0; w < 20; w++ {
 		go worker(jobs)
 	}
 

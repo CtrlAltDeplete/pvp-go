@@ -3,6 +3,8 @@ package daos
 import (
 	"PvP-Go/db/dtos"
 	"database/sql"
+	"fmt"
+	"log"
 )
 
 type BattleSimulationsDao struct{}
@@ -28,6 +30,54 @@ func (dao *BattleSimulationsDao) Create(allyId, enemyId int64, individualMatchup
 		return err, nil
 	}
 	return nil, newBattleSimulation(id, allyId, enemyId, individualMatchups)
+}
+
+func (dao *BattleSimulationsDao) BatchCreate(params []int64) {
+	var (
+		err                        error
+		allyId, enemyId            int64
+		zeroZero, zeroOne, zeroTwo int64
+		oneZero, oneOne, oneTwo    int64
+		twoZero, twoOne, twoTwo    int64
+		query                      = "INSERT INTO pvpgo.battle_simulations (ally_id, enemy_id, `0v0`, `0v1`, `0v2`, `1v0`, `1v1`, `1v2`, `2v0`, `2v1`, `2v2`, score) " +
+			"VALUES "
+	)
+	i := 0
+	for i < len(params) {
+		if i != 0 {
+			query += ", \n"
+		}
+		allyId = params[i]
+		i++
+		enemyId = params[i]
+		i++
+		zeroZero = params[i]
+		i++
+		zeroOne = params[i]
+		i++
+		zeroTwo = params[i]
+		i++
+		oneZero = params[i]
+		i++
+		oneOne = params[i]
+		i++
+		oneTwo = params[i]
+		i++
+		twoZero = params[i]
+		i++
+		twoOne = params[i]
+		i++
+		twoTwo = params[i]
+		i++
+		query += fmt.Sprintf("(%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d)", allyId, enemyId, zeroZero,
+			zeroOne, zeroTwo, oneZero, oneOne, oneTwo, twoZero, twoOne, twoTwo, dtos.CalculateTotalScore([]int64{
+				zeroZero, zeroOne, zeroTwo, oneZero, oneOne, oneTwo, twoZero, twoOne, twoTwo,
+			}))
+	}
+	_, err = LIVE.Exec(query)
+	if err != nil {
+		log.Printf("Battle Sims Failed: %v\n", params)
+	}
 }
 
 func newBattleSimulation(id, allyId, enemyId int64, individualMatchups []int64) *dtos.BattleSimulationDto {
