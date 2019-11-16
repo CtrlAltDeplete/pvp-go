@@ -3,6 +3,7 @@ package rawData
 import (
 	"PvP-Go/db/daos"
 	"PvP-Go/db/dtos"
+	"PvP-Go/models"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -116,7 +117,7 @@ func ParseAllTypeCharts() {
 		if len(dto.types) == 1 {
 			err, receivingType = daos.TYPES_DAO.Upsert(dto.types[0], nil)
 		} else {
-			err, receivingType = daos.TYPES_DAO.Upsert(dto.types[1], dto.types[1])
+			err, receivingType = daos.TYPES_DAO.Upsert(dto.types[0], dto.types[1])
 		}
 		daos.CheckError(err)
 		for _, actingType = range baseTypes {
@@ -167,7 +168,7 @@ func FillMoveDto(dto *moveDto) {
 	}
 	dto.typeId = pokemonType.Id()
 
-	if dto.MoveCategory == "Fast MoveDto" {
+	if dto.MoveCategory == "Fast Move" {
 		dto.power, err = strconv.ParseInt(dto.PvpFastPower, 10, 64)
 		daos.CheckError(err)
 
@@ -182,7 +183,7 @@ func FillMoveDto(dto *moveDto) {
 		dto.stageDelta.Valid = false
 		dto.stats.Valid = false
 		dto.target.Valid = false
-	} else if dto.MoveCategory == "Charge MoveDto" {
+	} else if dto.MoveCategory == "Charge Move" {
 		dto.power, err = strconv.ParseInt(dto.PvpChargeDamage, 10, 64)
 		daos.CheckError(err)
 
@@ -430,6 +431,8 @@ func ParseAllPokemonAndMovesets() {
 		err, pokemon = daos.POKEMON_DAO.Upsert(dto.gen, dto.name, dto.typeId, dto.atk, dto.def, dto.sta, dto.dateAdd,
 			dto.isLegendary, dto.isPvpEligible, 0, 0, 0, 0)
 		daos.CheckError(err)
+		move := daos.MOVES_DAO.FindAll()[0]
+		_ = models.NewPokemon(*pokemon, move, []dtos.MoveDto{move})
 
 		for moveId, isMoveLegacy := range dto.fastMoveIdAndIsLegacy {
 			err, _ = daos.POKEMON_HAS_MOVE_DAO.Upsert(pokemon.Id(), moveId, isMoveLegacy)

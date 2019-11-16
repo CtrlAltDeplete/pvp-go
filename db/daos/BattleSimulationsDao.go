@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/gob"
 	"fmt"
+	"log"
 	"os"
 	"time"
 )
@@ -78,7 +79,9 @@ func (dao *BattleSimulationsDao) BatchCreate(params []int64) {
 	}
 	_, err = LIVE.Exec(query)
 	if err != nil {
-		file, _ := os.Create(fmt.Sprintf("%s - error.log", time.Now()))
+		fileName := fmt.Sprintf("%s - error.log", time.Now())
+		log.Printf("Error: Creating [%s]\n", fileName)
+		file, _ := os.Create(fileName)
 		encode := gob.NewEncoder(file)
 		_ = encode.Encode(params)
 	}
