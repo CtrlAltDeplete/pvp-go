@@ -4,6 +4,7 @@ import (
 	"PvP-Go/db/dtos"
 	"database/sql"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -78,7 +79,12 @@ func (dao *BattleSimulationsDao) BatchCreate(params []int64) {
 				zeroZero, zeroOne, zeroTwo, oneZero, oneOne, oneTwo, twoZero, twoOne, twoTwo,
 			}))
 	}
-	_, err = LIVE.Exec(query)
+	err = errors.New("")
+	attempts := 0
+	for err != nil && attempts < 10 {
+		attempts++
+		_, err = LIVE.Exec(query)
+	}
 	if err != nil {
 		fileName := fmt.Sprintf("%s - error.log", time.Now())
 		log.Printf("Error: Creating [%s]\n", fileName)
