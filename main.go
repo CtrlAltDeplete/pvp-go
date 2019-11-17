@@ -10,26 +10,33 @@ import (
 )
 
 var (
-	mutex        = sync.Mutex{}
-	simWaitGroup = sync.WaitGroup{}
-	finished     = 0.0
-	total        = 0.0
-	allMoves     map[int64]dtos.MoveDto
-	allPokemon   map[int64]dtos.PokemonDto
-	allMovesets  []dtos.MoveSetDto
-	startTime    time.Time
-	batchParams  []int64
+	mutex         = sync.Mutex{}
+	simWaitGroup  = sync.WaitGroup{}
+	sqlQueueGroup = sync.WaitGroup{}
+	sqlDoneGroup  = sync.WaitGroup{}
+	finished      = 0.0
+	total         = 0.0
+	allMoves      map[int64]dtos.MoveDto
+	allPokemon    map[int64]dtos.PokemonDto
+	allMovesets   []dtos.MoveSetDto
+	startTime     time.Time
+	batchParams   []int64
 )
 
 func addToBatch(allyId, enemyId int64, allyResults []int64) {
-	mutex.Lock()
+	sqlQueueGroup.Wait()
 	batchParams = append(batchParams, allyId, enemyId)
 	batchParams = append(batchParams, allyResults...)
 	if len(batchParams) >= 5000*11 {
-		var oldParams = make([]int64, len(batchParams))
-		copy(oldParams, batchParams)
+		sqlQueueGroup.Add(1)
+		sqlDoneGroup.Add(1)
+		go func() {
+			sqlDoneGroup.Wait()
+			daos.BATTLE_SIMS_DAO.BatchCreate(batchParams)
+			sqlDoneGroup.Done()
+		}()
+		sqlQueueGroup.Done()
 		batchParams = []int64{}
-		daos.BATTLE_SIMS_DAO.BatchCreate(oldParams)
 
 		ratio := finished / (total * total)
 		past := float64(time.Now().Sub(startTime))
@@ -37,7 +44,6 @@ func addToBatch(allyId, enemyId int64, allyResults []int64) {
 		eta := startTime.Add(totalTime)
 		fmt.Printf("%f%% Finished:\tETA %s\n", finished*100.0/(total*total), eta)
 	}
-	mutex.Unlock()
 }
 
 func worker(jobs <-chan int) {
@@ -119,6 +125,7 @@ func main() {
 		jobs <- i
 	}
 	close(jobs)
+	sqlDoneGroup.Wait()
 	simWaitGroup.Wait()
 	if len(batchParams) > 0 {
 		daos.BATTLE_SIMS_DAO.BatchCreate(batchParams)
