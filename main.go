@@ -29,7 +29,7 @@ func addToBatch(allyId, enemyId int64, allyResults []int64) {
 	batchParams = append(batchParams, allyResults...)
 	if len(batchParams) >= 65000 {
 		sqlQueueGroup.Add(1)
-		var oldParams []int64
+		var oldParams = make([]int64, len(batchParams))
 		copy(oldParams, batchParams)
 		sqlDoneGroup.Wait()
 		go func() {
@@ -110,7 +110,7 @@ func main() {
 	}
 
 	fmt.Println("Gathering move sets...")
-	allMovesets = daos.MOVE_SETS_DAO.FindAll()
+	allMovesets = daos.MOVE_SETS_DAO.FindAll()[0:100]
 
 	fmt.Println("Preparing workers...")
 	total = float64(len(allMovesets))
