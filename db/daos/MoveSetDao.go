@@ -14,6 +14,7 @@ func (dao *MoveSetDao) FindSingleWhere(query string, params ...interface{}) (err
 		fastMoveId            int64
 		primaryChargeMoveId   int64
 		secondaryChargeMoveId *sql.NullInt64
+		simulated             bool
 		rows                  *sql.Rows
 		err                   error
 		count                 = 0
@@ -25,7 +26,7 @@ func (dao *MoveSetDao) FindSingleWhere(query string, params ...interface{}) (err
 	CheckError(err)
 	for rows.Next() {
 		count++
-		CheckError(rows.Scan(&id, &pokemonId, &fastMoveId, &primaryChargeMoveId, &secondaryChargeMoveId))
+		CheckError(rows.Scan(&id, &pokemonId, &fastMoveId, &primaryChargeMoveId, &secondaryChargeMoveId, &simulated))
 		if count > 1 {
 			break
 		}
@@ -35,7 +36,7 @@ func (dao *MoveSetDao) FindSingleWhere(query string, params ...interface{}) (err
 	if count == 0 {
 		return NO_ROWS, nil
 	} else if count == 1 {
-		return nil, newMoveSet(id, pokemonId, fastMoveId, primaryChargeMoveId, secondaryChargeMoveId)
+		return nil, newMoveSet(id, pokemonId, fastMoveId, primaryChargeMoveId, secondaryChargeMoveId, simulated)
 	} else {
 		return MULTIPLE_ROWS, nil
 	}
