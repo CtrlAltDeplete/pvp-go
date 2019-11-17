@@ -87,7 +87,7 @@ func (dao *BattleSimulationsDao) BatchCreate(params []int64) {
 	}
 	if err != nil {
 		fileName := fmt.Sprintf("%s - error.log", time.Now())
-		log.Printf("Error: Creating [%s]\n", fileName)
+		log.Printf("Error [%s]: Creating [%s]\n", err.Error(), fileName)
 		file, _ := os.Create(fileName)
 		encode := gob.NewEncoder(file)
 		_ = encode.Encode(params)
