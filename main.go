@@ -29,10 +29,12 @@ func addToBatch(allyId, enemyId int64, allyResults []int64) {
 	batchParams = append(batchParams, allyResults...)
 	if len(batchParams) >= 65000 {
 		sqlQueueGroup.Add(1)
+		var oldParams []int64
+		copy(oldParams, batchParams)
 		sqlDoneGroup.Wait()
 		go func() {
 			sqlDoneGroup.Add(1)
-			daos.BATTLE_SIMS_DAO.BatchCreate(batchParams)
+			daos.BATTLE_SIMS_DAO.BatchCreate(oldParams)
 			sqlDoneGroup.Done()
 		}()
 		sqlQueueGroup.Done()
