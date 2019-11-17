@@ -51,6 +51,7 @@ func (dao *MoveSetDao) FindWhere(query string, params ...interface{}) []dtos.Mov
 		fastMoveId            int64
 		primaryChargeMoveId   int64
 		secondaryChargeMoveId *sql.NullInt64
+		simulated             bool
 	)
 	query = "SELECT * " +
 		"FROM pvpgo.move_sets " +
@@ -58,8 +59,8 @@ func (dao *MoveSetDao) FindWhere(query string, params ...interface{}) []dtos.Mov
 	rows, err = LIVE.Query(query, params...)
 	CheckError(err)
 	for rows.Next() {
-		CheckError(rows.Scan(&id, &pokemonId, &fastMoveId, &primaryChargeMoveId, &secondaryChargeMoveId))
-		moveSets = append(moveSets, *newMoveSet(id, pokemonId, fastMoveId, primaryChargeMoveId, secondaryChargeMoveId))
+		CheckError(rows.Scan(&id, &pokemonId, &fastMoveId, &primaryChargeMoveId, &secondaryChargeMoveId, &simulated))
+		moveSets = append(moveSets, *newMoveSet(id, pokemonId, fastMoveId, primaryChargeMoveId, secondaryChargeMoveId, simulated))
 	}
 	CheckError(rows.Err())
 	CheckError(rows.Close())
@@ -70,7 +71,18 @@ func (dao *MoveSetDao) FindAll() []dtos.MoveSetDto {
 	return dao.FindWhere("TRUE ORDER BY id ASC")
 }
 
-func newMoveSet(id, pokemonId, fastMoveId, primaryChargeMoveId int64, secondaryChargeMoveId *sql.NullInt64) *dtos.MoveSetDto {
+func (dao *MoveSetDao) Update(moveSet dtos.MoveSetDto) {
+	var (
+		err   error
+		query = "UPDATE pvpgo.move_sets " +
+			"SET simulated = ? " +
+			"WHERE id = ?"
+	)
+	_, err = LIVE.Exec(query, moveSet.Simulated(), moveSet.Id())
+	CheckError(err)
+}
+
+func newMoveSet(id, pokemonId, fastMoveId, primaryChargeMoveId int64, secondaryChargeMoveId *sql.NullInt64, simulated bool) *dtos.MoveSetDto {
 	var moveSet = dtos.MoveSetDto{}
 	moveSet.SetId(id)
 	moveSet.SetPokemonId(pokemonId)
@@ -81,5 +93,6 @@ func newMoveSet(id, pokemonId, fastMoveId, primaryChargeMoveId int64, secondaryC
 	} else {
 		moveSet.SetSecondaryChargeMoveId(nil)
 	}
+	moveSet.SetSimulated(simulated)
 	return &moveSet
 }

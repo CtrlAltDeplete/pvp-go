@@ -45,6 +45,7 @@ func (dao *BattleSimulationsDao) BatchCreate(params []int64) {
 		query                      = "INSERT INTO pvpgo.battle_simulations (ally_id, enemy_id, `0v0`, `0v1`, `0v2`, `1v0`, `1v1`, `1v2`, `2v0`, `2v1`, `2v2`, score) " +
 			"VALUES "
 	)
+
 	i := 0
 	for i < len(params) {
 		if i != 0 {

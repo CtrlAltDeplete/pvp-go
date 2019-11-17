@@ -6,6 +6,7 @@ type MoveSetDto struct {
 	fastMoveId            int64
 	primaryChargeMoveId   int64
 	secondaryChargeMoveId *int64
+	simulated             bool
 }
 
 func (m *MoveSetDto) Id() int64 {
@@ -46,4 +47,12 @@ func (m *MoveSetDto) SecondaryChargeMoveId() *int64 {
 
 func (m *MoveSetDto) SetSecondaryChargeMoveId(secondaryChargeMoveId *int64) {
 	m.secondaryChargeMoveId = secondaryChargeMoveId
+}
+
+func (m *MoveSetDto) Simulated() bool {
+	return m.simulated
+}
+
+func (m *MoveSetDto) SetSimulated(simulated bool) {
+	m.simulated = simulated
 }

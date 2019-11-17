@@ -12,7 +12,6 @@ import (
 var (
 	mutex        = sync.Mutex{}
 	simWaitGroup = sync.WaitGroup{}
-	sqlWaitGroup = sync.WaitGroup{}
 	finished     = 0.0
 	total        = 0.0
 	allMoves     map[int64]dtos.MoveDto
@@ -23,25 +22,22 @@ var (
 )
 
 func addToBatch(allyId, enemyId int64, allyResults []int64) {
-	sqlWaitGroup.Wait()
+	mutex.Lock()
 	batchParams = append(batchParams, allyId, enemyId)
 	batchParams = append(batchParams, allyResults...)
-	if len(batchParams) >= 1000*11 {
+	if len(batchParams) >= 5000*11 {
 		var oldParams = make([]int64, len(batchParams))
 		copy(oldParams, batchParams)
 		batchParams = []int64{}
+		daos.BATTLE_SIMS_DAO.BatchCreate(oldParams)
 
 		ratio := finished / (total * total)
 		past := float64(time.Now().Sub(startTime))
 		totalTime := time.Duration(past / ratio)
 		eta := startTime.Add(totalTime)
 		fmt.Printf("%f%% Finished:\tETA %s\n", finished*100.0/(total*total), eta)
-		simWaitGroup.Add(1)
-		go func() {
-			daos.BATTLE_SIMS_DAO.BatchCreate(oldParams)
-			simWaitGroup.Done()
-		}()
 	}
+	mutex.Unlock()
 }
 
 func worker(jobs <-chan int) {
@@ -84,6 +80,10 @@ func worker(jobs <-chan int) {
 			mutex.Unlock()
 			j++
 		}
+		allyMovesetDto.SetSimulated(true)
+		mutex.Lock()
+		daos.MOVE_SETS_DAO.Update(allyMovesetDto)
+		mutex.Unlock()
 		simWaitGroup.Done()
 	}
 }
@@ -108,7 +108,7 @@ func main() {
 	total = float64(len(allMovesets))
 	jobs := make(chan int, int(total))
 
-	for w := 0; w < 20; w++ {
+	for w := 0; w < 40; w++ {
 		go worker(jobs)
 	}
 

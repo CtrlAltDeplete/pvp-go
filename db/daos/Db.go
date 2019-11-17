@@ -10,9 +10,9 @@ import (
 )
 
 var (
-	LIVE = NewDB(os.Getenv("pvp-go.db.user"),
-		os.Getenv("pvp-go.db.password"),
-		os.Getenv("pvp-go.db.endpoint"))
+	LIVE = NewDB(os.Getenv("PVP_GO_DB_USER"),
+		os.Getenv("PVP_GO_DB_PASSWORD"),
+		os.Getenv("PVP_GO_DB_ENDPOINT"))
 	NO_ROWS              = errors.New("No rows found.")
 	MULTIPLE_ROWS        = errors.New("Multiple rows found.")
 	BAD_PARAMS           = errors.New("Bad parameters for DAO.")
