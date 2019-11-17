@@ -27,7 +27,7 @@ func addToBatch(allyId, enemyId int64, allyResults []int64) {
 	sqlQueueGroup.Wait()
 	batchParams = append(batchParams, allyId, enemyId)
 	batchParams = append(batchParams, allyResults...)
-	if len(batchParams) >= 5000*11 {
+	if len(batchParams) >= 65000 {
 		sqlQueueGroup.Add(1)
 		sqlDoneGroup.Wait()
 		go func() {
