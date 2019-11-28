@@ -22,6 +22,7 @@ var (
 	MOVE_SETS_DAO        = MoveSetDao{}
 	POKEMON_DAO          = PokemonDao{}
 	POKEMON_HAS_MOVE_DAO = PokemonHasMoveDao{}
+	RANKINGS_DAO         = RankingsDao{}
 	TYPE_MULTIPLIER_DAO  = TypeMultipliersDao{}
 	TYPES_DAO            = TypesDao{}
 )

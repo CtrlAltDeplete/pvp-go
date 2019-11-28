@@ -42,6 +42,10 @@ func (b *BattleSimulationDto) SetIndividualMatchups(individualMatchups []int64) 
 	b.score = CalculateTotalScore(individualMatchups)
 }
 
+func (b *BattleSimulationDto) Score() float64 {
+	return float64(b.score)
+}
+
 func CalculateTotalScore(individualMatchups []int64) int64 {
 	return int64(math.Round(float64(individualMatchups[0]+2*individualMatchups[1]+individualMatchups[2]+
 		2*individualMatchups[3]+4*individualMatchups[4]+2*individualMatchups[5]+

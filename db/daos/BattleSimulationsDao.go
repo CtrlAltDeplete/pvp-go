@@ -8,10 +8,83 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
 type BattleSimulationsDao struct{}
+
+func (dao *BattleSimulationsDao) FindSingleWhere(query string, params ...interface{}) (error, *dtos.BattleSimulationDto) {
+	var (
+		id                                          int64
+		allyId                                      int64
+		enemyId                                     int64
+		zvz, zvo, zvt, ovz, ovo, ovt, tvz, tvo, tvt int64
+		score                                       int64
+		rows                                        *sql.Rows
+		err                                         error
+		count                                       = 0
+	)
+	query = "SELECT * " +
+		"FROM pvpgo.battle_simulations " +
+		"WHERE " + query
+	rows, err = LIVE.Query(query, params...)
+	CheckError(err)
+	for rows.Next() {
+		count++
+		CheckError(rows.Scan(&id, &allyId, &enemyId, &zvz, &zvo, &zvt, &ovz, &ovo, &ovt, &tvz, &tvo, &tvt, &score))
+		if count > 1 {
+			break
+		}
+	}
+	CheckError(rows.Err())
+	CheckError(rows.Close())
+	if count == 0 {
+		return NO_ROWS, nil
+	} else if count == 1 {
+		return nil, newBattleSimulation(id, allyId, enemyId, []int64{zvz, zvo, zvt, ovz, ovo, ovt, tvz, tvo, tvt})
+	} else {
+		return MULTIPLE_ROWS, nil
+	}
+}
+
+func (dao *BattleSimulationsDao) FindWhere(query string, params ...interface{}) []dtos.BattleSimulationDto {
+	var (
+		sims                                        = []dtos.BattleSimulationDto{}
+		rows                                        *sql.Rows
+		err                                         error
+		id                                          int64
+		allyId                                      int64
+		enemyId                                     int64
+		zvz, zvo, zvt, ovz, ovo, ovt, tvz, tvo, tvt int64
+		score                                       int64
+	)
+	query = "SELECT * " +
+		"FROM pvpgo.battle_simulations " +
+		"WHERE " + query
+	rows, err = LIVE.Query(query, params...)
+	CheckError(err)
+	for rows.Next() {
+		CheckError(rows.Scan(&id, &allyId, &enemyId, &zvz, &zvo, &zvt, &ovz, &ovo, &ovt, &tvz, &tvo, &tvt, &score))
+		sims = append(sims, *newBattleSimulation(id, allyId, enemyId, []int64{zvz, zvo, zvt, ovz, ovo, ovt, tvz, tvo, tvt}))
+	}
+	CheckError(rows.Err())
+	CheckError(rows.Close())
+	return sims
+}
+
+func (dao *BattleSimulationsDao) FindMatchupsForAlly(allyId int64, enemyIds []int64) []dtos.BattleSimulationDto {
+	var (
+		params []interface{}
+		query  = "ally_id = ? " +
+			"AND enemy_id IN (?" + strings.Repeat(", ?", len(enemyIds)-1) + ")"
+	)
+	params = append(params, allyId)
+	for _, enemyId := range enemyIds {
+		params = append(params, enemyId)
+	}
+	return dao.FindWhere(query, params...)
+}
 
 func (dao *BattleSimulationsDao) Create(allyId, enemyId int64, individualMatchups []int64) (error, *dtos.BattleSimulationDto) {
 	var (
