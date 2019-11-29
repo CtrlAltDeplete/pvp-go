@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"gonum.org/v1/gonum/mat"
 	"log"
+	"math"
 	"sort"
 	"sync"
 )
@@ -268,21 +269,83 @@ func (cup *Cup) getRankings(controlVector *mat.Dense) []Ranking {
 	return rankings
 }
 
-// TODO: Create the tables for these functions to write to
-
-func (cup *Cup) CalculateTeams(moveSetId int64) []int64 {
-	// TODO: Finish this function, call it, write to DB
-	return []int64{}
+func (cup *Cup) CalculateTeams(pokemonId int64, pokemonRankings map[int64][]Ranking) ([]int64, float64) {
+	var bestTeam []int64
+	bestScore := 0.0
+	pokemon := pokemonRankings[pokemonId][0]
+	for _, allyGroupOne := range pokemonRankings {
+		allyOne := allyGroupOne[0]
+		if allyOne.pokemonRank == pokemon.pokemonRank {
+			continue
+		}
+		teamScore := 0.0
+		for _, allyGroupTwo := range pokemonRankings {
+			allyTwo := allyGroupTwo[0]
+			if allyOne.score >= allyTwo.score {
+				continue
+			}
+			for _, enemyGroup := range pokemonRankings {
+				enemy := enemyGroup[0]
+				enemyScore := cup.battleMatrix[pokemon.moveSet.Id()][enemy.moveSet.Id()]
+				enemyScore = math.Max(enemyScore, cup.battleMatrix[allyOne.moveSet.Id()][enemy.moveSet.Id()])
+				enemyScore = math.Max(enemyScore, cup.battleMatrix[allyTwo.moveSet.Id()][enemy.moveSet.Id()])
+				teamScore += enemyScore * enemy.score / 100.0
+			}
+			if bestScore < teamScore {
+				bestScore = teamScore
+				bestTeam = []int64{allyOne.moveSet.PokemonId(), allyTwo.moveSet.PokemonId()}
+			}
+		}
+	}
+	return bestTeam, bestScore
 }
 
-func (cup *Cup) CalculateGoodMatchUps(moveSetId int64) []int64 {
-	// TODO: Finish this function, call it, write to DB
-	return []int64{}
+func (cup *Cup) CalculateGoodMatchUps(pokemonId int64, pokemonRankings map[int64][]Ranking) []int64 {
+	type PokemonAndScore struct {
+		pokemonId int64
+		score float64
+	}
+	var enemies []PokemonAndScore
+
+	pokemon := pokemonRankings[pokemonId][0]
+	for _, enemyGroup := range pokemonRankings {
+		enemy := enemyGroup[0]
+		enemyScore := cup.battleMatrix[pokemon.moveSet.Id()][enemy.moveSet.Id()] * enemy.score / 100.0
+		enemies = append(enemies, PokemonAndScore{enemy.moveSet.PokemonId(), enemyScore})
+	}
+	sort.Slice(enemies, func(i, j int) bool {
+		return enemies[i].score < enemies[j].score
+	})
+
+	var results []int64
+	for i := 0; i < 3; i++ {
+		results = append(results, enemies[i].pokemonId)
+	}
+	return results
 }
 
-func (cup *Cup) CalculateBadMatchUps(moveSetId int64) []int64 {
-	// TODO: Finish this function, call it, write to DB
-	return []int64{}
+func (cup *Cup) CalculateBadMatchUps(pokemonId int64, pokemonRankings map[int64][]Ranking) []int64 {
+	type PokemonAndScore struct {
+		pokemonId int64
+		score float64
+	}
+	var enemies []PokemonAndScore
+
+	pokemon := pokemonRankings[pokemonId][0]
+	for _, enemyGroup := range pokemonRankings {
+		enemy := enemyGroup[0]
+		enemyScore := cup.battleMatrix[enemy.moveSet.Id()][pokemon.moveSet.Id()] * enemy.score / 100.0
+		enemies = append(enemies, PokemonAndScore{enemy.moveSet.PokemonId(), enemyScore})
+	}
+	sort.Slice(enemies, func(i, j int) bool {
+		return enemies[i].score < enemies[j].score
+	})
+
+	var results []int64
+	for i := 0; i < 3; i++ {
+		results = append(results, enemies[i].pokemonId)
+	}
+	return results
 }
 
 type Ranking struct {
