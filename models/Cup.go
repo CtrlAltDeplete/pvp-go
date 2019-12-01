@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	TEST     = newCup("test", "id IN (2, 3, 5, 6, 8, 9)")
-	SINISTER = newCup("sinister", `id IN (
+	TEST_SQL     = "id IN (2, 3, 5, 6, 8, 9)"
+	SINISTER_SQL = `id IN (
 SELECT p.id
 FROM pokemon p
 LEFT JOIN types t ON p.type_id = t.id
@@ -25,8 +25,8 @@ WHERE (
 AND NOT t.second_type <=> 'dark'
 AND p.name NOT IN ('Skarmory', 'Hypno')
 AND p.is_pvp_eligible
-AND NOT p.is_legendary)`)
-	FEROCIOUS = newCup("ferocious", `id IN (
+AND NOT p.is_legendary)`
+	FEROCIOUS_SQL = `id IN (
 SELECT p.id
 FROM pokemon p
 WHERE p.name IN ('Absol', 'Aggron', 'Ampharos', 'Arcanine', 'Aron', 'Bagon', 'Bibarel', 'Bidoof', 'Blitzle', 'Buizel', 
@@ -42,8 +42,8 @@ WHERE p.name IN ('Absol', 'Aggron', 'Ampharos', 'Arcanine', 'Aron', 'Bagon', 'Bi
 'Sandslash', 'Alolan Sandslash', 'Sandshrew', 'Alolan Sandshrew', 'Sentret', 'Shelgon', 'Shinx', 'Skitty', 'Skuntank', 
 'Smeargle', 'Sneasel', 'Spoink', 'Stantler', 'Stoutland', 'Stunky', 'Suicune', 'Swinub', 'Tauros', 'Teddiursa', 
 'Torkoal', 'Tyranitar', 'Umbreon', 'Ursaring', 'Vaporeon', 'Vulpix', 'Alolan Vulpix', 'Watchog', 'Weavile', 'Zangoose', 
-'Zebstrika', 'Zigzagoon'))`)
-	TIMELESS = newCup("timeless", `id IN (SELECT p.id
+'Zebstrika', 'Zigzagoon'))`
+	TIMELESS_SQL = `id IN (SELECT p.id
 FROM pokemon p
 WHERE p.name IN ('Abomasnow', 'Absol', 'Ampharos', 'Anorith', 'Arbok', 'Arcanine', 'Ariados', 'Armaldo', 'Bagon', 
 'Banette', 'Barboach', 'Bayleef', 'Beedrill', 'Bellossom', 'Bellsprout', 'Blastoise', 'Blaziken', 'Bonsly', 'Budew', 
@@ -72,7 +72,7 @@ WHERE p.name IN ('Abomasnow', 'Absol', 'Ampharos', 'Anorith', 'Arbok', 'Arcanine
 'Torterra', 'Totodile', 'Trapinch', 'Treecko', 'Turtwig', 'Typhlosion', 'Tyranitar', 'Vaporeon', 'Venomoth', 'Venonat',
 'Venusaur', 'Vibrava', 'Victreebel', 'Vileplume', 'Volbeat', 'Voltorb', 'Vulpix', 'Wailmer', 'Wailord', 'Walrein', 
 'Wartortle', 'Weavile', 'Weedle', 'Weepinbell', 'Weezing', 'Whiscash', 'Wooper', 'Wormadam (Plant Cloak)', 
-'Wormadam (Sandy Cloak)', 'Wurmple') )`)
+'Wormadam (Sandy Cloak)', 'Wurmple') )`
 )
 
 type Cup struct {
@@ -269,83 +269,97 @@ func (cup *Cup) getRankings(controlVector *mat.Dense) []Ranking {
 	return rankings
 }
 
-func (cup *Cup) CalculateTeams(pokemonId int64, pokemonRankings map[int64][]Ranking) ([]int64, float64) {
-	var bestTeam []int64
-	bestScore := 0.0
-	pokemon := pokemonRankings[pokemonId][0]
-	for _, allyGroupOne := range pokemonRankings {
-		allyOne := allyGroupOne[0]
-		if allyOne.pokemonRank == pokemon.pokemonRank {
-			continue
-		}
-		teamScore := 0.0
-		for _, allyGroupTwo := range pokemonRankings {
-			allyTwo := allyGroupTwo[0]
-			if allyOne.score >= allyTwo.score {
-				continue
-			}
-			for _, enemyGroup := range pokemonRankings {
-				enemy := enemyGroup[0]
-				enemyScore := cup.battleMatrix[pokemon.moveSet.Id()][enemy.moveSet.Id()]
-				enemyScore = math.Max(enemyScore, cup.battleMatrix[allyOne.moveSet.Id()][enemy.moveSet.Id()])
-				enemyScore = math.Max(enemyScore, cup.battleMatrix[allyTwo.moveSet.Id()][enemy.moveSet.Id()])
-				teamScore += enemyScore * enemy.score / 100.0
-			}
-			if bestScore < teamScore {
-				bestScore = teamScore
-				bestTeam = []int64{allyOne.moveSet.PokemonId(), allyTwo.moveSet.PokemonId()}
-			}
-		}
+func (cup *Cup) CalculateOtherTables() {
+	var pokemonRankings [][]int64
+	var indices = make(chan int)
+
+	for i, ranking := range daos.RANKINGS_DAO.FindWhere("cup = ? AND pokemon_rank IS NOT NULL", cup.name) {
+		cup.wg.Add(3)
+		pokemonRankings = append(pokemonRankings, []int64{ranking.PokemonId(), ranking.MoveSetId(), int64(math.Round(ranking.MoveSetRank()))})
+		indices <- i
 	}
-	return bestTeam, bestScore
+
+	for w := 0; w < 3; w++ {
+		go cup.CalculateTeams(indices, pokemonRankings)
+		go cup.CalculateGoodMatchUps(indices, pokemonRankings)
+		go cup.CalculateBadMatchUps(indices, pokemonRankings)
+	}
+	cup.wg.Wait()
 }
 
-func (cup *Cup) CalculateGoodMatchUps(pokemonId int64, pokemonRankings map[int64][]Ranking) []int64 {
-	type PokemonAndScore struct {
-		pokemonId int64
-		score float64
+func (cup *Cup) CalculateTeams(indices <-chan int, pokemonRankings [][]int64) {
+	for index := range indices {
+		bestScore := 0.0
+		var bestTeam []int64
+		pokemonId := pokemonRankings[index][0]
+		moveSetId := pokemonRankings[index][1]
+		for i, allyOne := range pokemonRankings[index : len(pokemonRankings)-1] {
+			allyOneId := allyOne[0]
+			allyOneMoveSetId := allyOne[1]
+			for _, allyTwo := range pokemonRankings[i : len(pokemonRankings)-1] {
+				teamScore := 0.0
+				allyTwoId := allyTwo[0]
+				allyTwoMoveSetId := allyTwo[1]
+				for _, enemy := range pokemonRankings {
+					enemyMoveSetId := enemy[1]
+					enemyScore := cup.battleMatrix[moveSetId][enemyMoveSetId]
+					enemyScore = math.Max(enemyScore, cup.battleMatrix[allyOneMoveSetId][enemyMoveSetId])
+					enemyScore = math.Max(enemyScore, cup.battleMatrix[allyTwoMoveSetId][enemyMoveSetId])
+					teamScore += enemyScore * float64(enemy[2]) / 100.0
+				}
+				if teamScore > bestScore {
+					bestScore = teamScore
+					bestTeam = []int64{pokemonId, allyOneId, allyTwoId}
+				}
+			}
+		}
+		if bestTeam == nil {
+			log.Fatal("Cannot have nil bestTeam")
+		}
+		err, _ := daos.TEAM_RANKINGS_DAO.Create(cup.name, bestTeam[0], bestTeam[1], bestTeam[2], bestScore)
+		daos.CheckError(err)
+		cup.wg.Done()
 	}
-	var enemies []PokemonAndScore
-
-	pokemon := pokemonRankings[pokemonId][0]
-	for _, enemyGroup := range pokemonRankings {
-		enemy := enemyGroup[0]
-		enemyScore := cup.battleMatrix[pokemon.moveSet.Id()][enemy.moveSet.Id()] * enemy.score / 100.0
-		enemies = append(enemies, PokemonAndScore{enemy.moveSet.PokemonId(), enemyScore})
-	}
-	sort.Slice(enemies, func(i, j int) bool {
-		return enemies[i].score < enemies[j].score
-	})
-
-	var results []int64
-	for i := 0; i < 3; i++ {
-		results = append(results, enemies[i].pokemonId)
-	}
-	return results
 }
 
-func (cup *Cup) CalculateBadMatchUps(pokemonId int64, pokemonRankings map[int64][]Ranking) []int64 {
-	type PokemonAndScore struct {
-		pokemonId int64
-		score float64
+func (cup *Cup) CalculateGoodMatchUps(indices <-chan int, pokemonRankings [][]int64) {
+	for index := range indices {
+		var bestMatchups [][]int64
+		pokemonId := pokemonRankings[index][0]
+		moveSetId := pokemonRankings[index][1]
+		for _, enemy := range pokemonRankings {
+			enemyMoveSetId := enemy[1]
+			enemyScore := int64(math.Round(cup.battleMatrix[moveSetId][enemyMoveSetId] * float64(enemy[2]) / 100.0))
+			bestMatchups = append(bestMatchups, []int64{enemy[0], enemyScore})
+		}
+		sort.Slice(bestMatchups, func(i, j int) bool {
+			return bestMatchups[i][1] < bestMatchups[j][1]
+		})
+		err, _ := daos.MATCH_UPS_DAO.Create(cup.name, "good", pokemonId, bestMatchups[0][0],
+			bestMatchups[1][0], bestMatchups[2][0])
+		daos.CheckError(err)
+		cup.wg.Done()
 	}
-	var enemies []PokemonAndScore
+}
 
-	pokemon := pokemonRankings[pokemonId][0]
-	for _, enemyGroup := range pokemonRankings {
-		enemy := enemyGroup[0]
-		enemyScore := cup.battleMatrix[enemy.moveSet.Id()][pokemon.moveSet.Id()] * enemy.score / 100.0
-		enemies = append(enemies, PokemonAndScore{enemy.moveSet.PokemonId(), enemyScore})
+func (cup *Cup) CalculateBadMatchUps(indices <-chan int, pokemonRankings [][]int64) {
+	for index := range indices {
+		var worstMatchUps [][]int64
+		pokemonId := pokemonRankings[index][0]
+		moveSetId := pokemonRankings[index][1]
+		for _, enemy := range pokemonRankings {
+			enemyMoveSetId := enemy[1]
+			enemyScore := int64(math.Round(cup.battleMatrix[moveSetId][enemyMoveSetId] * float64(enemy[2]) / 100.0))
+			worstMatchUps = append(worstMatchUps, []int64{enemy[0], enemyScore})
+		}
+		sort.Slice(worstMatchUps, func(i, j int) bool {
+			return worstMatchUps[i][1] > worstMatchUps[j][1]
+		})
+		err, _ := daos.MATCH_UPS_DAO.Create(cup.name, "bad", pokemonId, worstMatchUps[0][0],
+			worstMatchUps[1][0], worstMatchUps[2][0])
+		daos.CheckError(err)
+		cup.wg.Done()
 	}
-	sort.Slice(enemies, func(i, j int) bool {
-		return enemies[i].score < enemies[j].score
-	})
-
-	var results []int64
-	for i := 0; i < 3; i++ {
-		results = append(results, enemies[i].pokemonId)
-	}
-	return results
 }
 
 type Ranking struct {
@@ -354,7 +368,7 @@ type Ranking struct {
 	pokemonRank interface{}
 }
 
-func newCup(name, cupSql string) *Cup {
+func NewCup(name, cupSql string) *Cup {
 	var cup = Cup{}
 	cup.name = name
 	cup.pokemon = daos.POKEMON_DAO.FindWhere(cupSql)

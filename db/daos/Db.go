@@ -18,11 +18,13 @@ var (
 	BAD_PARAMS           = errors.New("Bad parameters for DAO.")
 	BATTLE_SIMS_DAO      = BattleSimulationsDao{}
 	CP_DAO               = CpDao{}
+	MATCH_UPS_DAO        = MatchUpsDao{}
 	MOVES_DAO            = MovesDao{}
 	MOVE_SETS_DAO        = MoveSetDao{}
 	POKEMON_DAO          = PokemonDao{}
 	POKEMON_HAS_MOVE_DAO = PokemonHasMoveDao{}
 	RANKINGS_DAO         = RankingsDao{}
+	TEAM_RANKINGS_DAO    = TeamRankingsDao{}
 	TYPE_MULTIPLIER_DAO  = TypeMultipliersDao{}
 	TYPES_DAO            = TypesDao{}
 )
