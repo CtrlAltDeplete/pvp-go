@@ -88,6 +88,10 @@ type Cup struct {
 	goal           float64
 }
 
+func (cup *Cup) SimulateNewMoveSet(moveSetId int64) {
+
+}
+
 func (cup *Cup) FillBattleMatrix() {
 	cup.battleMatrix = map[int64]map[int64]float64{}
 	ids := make(chan int, len(cup.ids))
@@ -271,19 +275,30 @@ func (cup *Cup) getRankings(controlVector *mat.Dense) []Ranking {
 
 func (cup *Cup) CalculateOtherTables() {
 	var pokemonRankings [][]int64
-	var indices = make(chan int)
+	var teams = make(chan int)
+	var goodMatchUps = make(chan int)
+	var badMatchUps = make(chan int)
 
-	for i, ranking := range daos.RANKINGS_DAO.FindWhere("cup = ? AND pokemon_rank IS NOT NULL", cup.name) {
-		cup.wg.Add(3)
+	for _, ranking := range daos.RANKINGS_DAO.FindWhere("cup = ? AND pokemon_rank IS NOT NULL", cup.name) {
 		pokemonRankings = append(pokemonRankings, []int64{ranking.PokemonId(), ranking.MoveSetId(), int64(math.Round(ranking.MoveSetRank()))})
-		indices <- i
 	}
 
 	for w := 0; w < 3; w++ {
-		go cup.CalculateTeams(indices, pokemonRankings)
-		go cup.CalculateGoodMatchUps(indices, pokemonRankings)
-		go cup.CalculateBadMatchUps(indices, pokemonRankings)
+		go cup.CalculateTeams(teams, pokemonRankings)
+		go cup.CalculateGoodMatchUps(goodMatchUps, pokemonRankings)
+		go cup.CalculateBadMatchUps(badMatchUps, pokemonRankings)
 	}
+	cup.current = 0.0
+
+	for i := range pokemonRankings {
+		cup.wg.Add(3)
+		teams <- i
+		goodMatchUps <- i
+		badMatchUps <- i
+	}
+	close(teams)
+	close(goodMatchUps)
+	close(badMatchUps)
 	cup.wg.Wait()
 }
 
@@ -293,7 +308,7 @@ func (cup *Cup) CalculateTeams(indices <-chan int, pokemonRankings [][]int64) {
 		var bestTeam []int64
 		pokemonId := pokemonRankings[index][0]
 		moveSetId := pokemonRankings[index][1]
-		for i, allyOne := range pokemonRankings[index : len(pokemonRankings)-1] {
+		for i, allyOne := range pokemonRankings {
 			allyOneId := allyOne[0]
 			allyOneMoveSetId := allyOne[1]
 			for _, allyTwo := range pokemonRankings[i : len(pokemonRankings)-1] {
@@ -316,49 +331,55 @@ func (cup *Cup) CalculateTeams(indices <-chan int, pokemonRankings [][]int64) {
 		if bestTeam == nil {
 			log.Fatal("Cannot have nil bestTeam")
 		}
+		cup.mutex.Lock()
 		err, _ := daos.TEAM_RANKINGS_DAO.Create(cup.name, bestTeam[0], bestTeam[1], bestTeam[2], bestScore)
 		daos.CheckError(err)
 		cup.wg.Done()
+		cup.current++
+		fmt.Printf("%f%% done\n", cup.current*100.0/float64(3*len(pokemonRankings)))
+		cup.mutex.Unlock()
 	}
 }
 
 func (cup *Cup) CalculateGoodMatchUps(indices <-chan int, pokemonRankings [][]int64) {
+	var goodMatchUps [][]int64
 	for index := range indices {
-		var bestMatchups [][]int64
+		goodMatchUps = make([][]int64, len(pokemonRankings))
+		copy(goodMatchUps, pokemonRankings)
 		pokemonId := pokemonRankings[index][0]
 		moveSetId := pokemonRankings[index][1]
-		for _, enemy := range pokemonRankings {
-			enemyMoveSetId := enemy[1]
-			enemyScore := int64(math.Round(cup.battleMatrix[moveSetId][enemyMoveSetId] * float64(enemy[2]) / 100.0))
-			bestMatchups = append(bestMatchups, []int64{enemy[0], enemyScore})
-		}
-		sort.Slice(bestMatchups, func(i, j int) bool {
-			return bestMatchups[i][1] < bestMatchups[j][1]
+		sort.Slice(goodMatchUps, func(i, j int) bool {
+			return cup.battleMatrix[moveSetId][goodMatchUps[i][1]]*float64(goodMatchUps[i][2]) > cup.battleMatrix[moveSetId][goodMatchUps[j][1]]*float64(goodMatchUps[j][2])
 		})
-		err, _ := daos.MATCH_UPS_DAO.Create(cup.name, "good", pokemonId, bestMatchups[0][0],
-			bestMatchups[1][0], bestMatchups[2][0])
+		cup.mutex.Lock()
+		err, _ := daos.MATCH_UPS_DAO.Create(cup.name, "good", pokemonId, goodMatchUps[0][0],
+			goodMatchUps[1][0], goodMatchUps[2][0])
 		daos.CheckError(err)
 		cup.wg.Done()
+		cup.current++
+		fmt.Printf("%f%% done\n", cup.current*100.0/float64(3*len(pokemonRankings)))
+		cup.mutex.Unlock()
 	}
 }
 
 func (cup *Cup) CalculateBadMatchUps(indices <-chan int, pokemonRankings [][]int64) {
+	var badMatchUps [][]int64
 	for index := range indices {
-		var worstMatchUps [][]int64
+		badMatchUps = make([][]int64, len(pokemonRankings))
+		copy(badMatchUps, pokemonRankings)
 		pokemonId := pokemonRankings[index][0]
 		moveSetId := pokemonRankings[index][1]
-		for _, enemy := range pokemonRankings {
-			enemyMoveSetId := enemy[1]
-			enemyScore := int64(math.Round(cup.battleMatrix[moveSetId][enemyMoveSetId] * float64(enemy[2]) / 100.0))
-			worstMatchUps = append(worstMatchUps, []int64{enemy[0], enemyScore})
-		}
-		sort.Slice(worstMatchUps, func(i, j int) bool {
-			return worstMatchUps[i][1] > worstMatchUps[j][1]
+		sort.Slice(badMatchUps, func(i, j int) bool {
+			return cup.battleMatrix[moveSetId][badMatchUps[i][1]]/float64(badMatchUps[i][2]) < cup.battleMatrix[moveSetId][badMatchUps[j][1]]/float64(badMatchUps[j][2])
 		})
-		err, _ := daos.MATCH_UPS_DAO.Create(cup.name, "bad", pokemonId, worstMatchUps[0][0],
-			worstMatchUps[1][0], worstMatchUps[2][0])
+		cup.mutex.Lock()
+		err, _ := daos.MATCH_UPS_DAO.Create(cup.name, "bad", pokemonId, badMatchUps[0][0],
+			badMatchUps[1][0], badMatchUps[2][0])
 		daos.CheckError(err)
 		cup.wg.Done()
+		cup.current++
+		fmt.Printf("%f%% done\n", cup.current*100.0/float64(3*len(pokemonRankings)))
+		cup.mutex.Unlock()
 	}
 }
 

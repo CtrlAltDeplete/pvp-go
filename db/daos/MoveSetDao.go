@@ -44,7 +44,7 @@ func (dao *MoveSetDao) FindSingleWhere(query string, params ...interface{}) (err
 
 func (dao *MoveSetDao) FindWhere(query string, params ...interface{}) []dtos.MoveSetDto {
 	var (
-		moveSets              = []dtos.MoveSetDto{}
+		moveSets              []dtos.MoveSetDto
 		rows                  *sql.Rows
 		err                   error
 		id                    int64

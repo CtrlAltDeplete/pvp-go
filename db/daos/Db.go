@@ -16,6 +16,7 @@ var (
 	NO_ROWS              = errors.New("No rows found.")
 	MULTIPLE_ROWS        = errors.New("Multiple rows found.")
 	BAD_PARAMS           = errors.New("Bad parameters for DAO.")
+	API_DAO              = ApiDao{}
 	BATTLE_SIMS_DAO      = BattleSimulationsDao{}
 	CP_DAO               = CpDao{}
 	MATCH_UPS_DAO        = MatchUpsDao{}

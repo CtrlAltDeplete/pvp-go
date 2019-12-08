@@ -18,7 +18,7 @@ var (
 	total         float64
 	allMoves      map[int64]dtos.MoveDto
 	allPokemon    map[int64]dtos.PokemonDto
-	allMovesets   []dtos.MoveSetDto
+	allMoveSets   []dtos.MoveSetDto
 	startTime     time.Time
 	batchParams   []int64
 )
@@ -40,17 +40,17 @@ func addToBatch(allyId, enemyId int64, allyResults []int64) {
 		sqlQueueGroup.Done()
 		batchParams = []int64{}
 
-		ratio := finished / (total * total)
+		ratio := finished / total
 		past := float64(time.Now().Sub(startTime))
 		totalTime := time.Duration(past / ratio)
 		eta := startTime.Add(totalTime)
-		fmt.Printf("%f%% Finished:\tETA %s\n", finished*100.0/(total*total), eta)
+		fmt.Printf("%f%% Finished:\tETA %s\n", finished*100.0/total, eta)
 	}
 }
 
 func worker(jobs <-chan int) {
 	for i := range jobs {
-		allyMovesetDto := allMovesets[i]
+		allyMovesetDto := allMoveSets[i]
 		allyPokeDto := allPokemon[allyMovesetDto.PokemonId()]
 		allyFastMoveDto := allMoves[allyMovesetDto.FastMoveId()]
 		allyChargeMoveDtos := []dtos.MoveDto{allMoves[allyMovesetDto.PrimaryChargeMoveId()]}
@@ -59,9 +59,9 @@ func worker(jobs <-chan int) {
 		}
 		ally := *models.NewPokemon(allyPokeDto, allyFastMoveDto, allyChargeMoveDtos)
 
-		j := i
-		for j < int(total) {
-			enemyMovesetDto := allMovesets[j]
+		j := 0
+		for j <= i {
+			enemyMovesetDto := allMoveSets[j]
 			enemyPokeDto := allPokemon[enemyMovesetDto.PokemonId()]
 			enemyFastMoveDto := allMoves[enemyMovesetDto.FastMoveId()]
 			enemyChargeMoveDtos := []dtos.MoveDto{allMoves[enemyMovesetDto.PrimaryChargeMoveId()]}
@@ -82,7 +82,6 @@ func worker(jobs <-chan int) {
 			finished++
 			addToBatch(allyMovesetDto.Id(), enemyMovesetDto.Id(), allyResults)
 			if allyMovesetDto.Id() != enemyMovesetDto.Id() {
-				finished++
 				addToBatch(enemyMovesetDto.Id(), allyMovesetDto.Id(), enemyResults)
 			}
 			mutex.Unlock()
@@ -113,21 +112,30 @@ func Simulate() {
 	}
 
 	fmt.Println("Gathering move sets...")
-	allMovesets = daos.MOVE_SETS_DAO.FindAll()[0:100]
+	allMoveSets = daos.MOVE_SETS_DAO.FindWhere("1 = 1 ORDER BY id ASC")
 
 	fmt.Println("Preparing workers...")
-	total = float64(len(allMovesets))
-	jobs := make(chan int, int(total))
+	jobCount := 0
+	for i := range allMoveSets {
+		if !allMoveSets[i].Simulated() {
+			jobCount++
+			total += float64(i)
+		}
+	}
+	fmt.Printf("Found %d new move sets to simulate.\n", jobCount)
+	jobs := make(chan int, jobCount)
 
-	for w := 0; w < 40; w++ {
+	for w := 0; w < 12; w++ {
 		go worker(jobs)
 	}
 
 	fmt.Println("Starting work...")
 	startTime = time.Now()
-	for i := range allMovesets {
-		simWaitGroup.Add(1)
-		jobs <- i
+	for i := range allMoveSets {
+		if !allMoveSets[i].Simulated() {
+			simWaitGroup.Add(1)
+			jobs <- i
+		}
 	}
 	close(jobs)
 	sqlDoneGroup.Wait()
