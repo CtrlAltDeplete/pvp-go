@@ -1,8 +1,8 @@
 package main
 
-import "PvP-Go/processes"
+import "PvP-Go/api"
 
 func main() {
-	//api.Rest()
-	processes.Simulate()
+	api.Rest()
+	//processes.Simulate()
 }

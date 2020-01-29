@@ -1,6 +1,13 @@
 package dtos
 
-type ApiRankingDto struct {
+type ApiCupRankingDto struct {
+	Name         string  `json:"name"`
+	Id           int64   `json:"id"`
+	RelativeRank int64   `json:"relativeRank"`
+	AbsoluteRank float64 `json:"absoluteRank"`
+}
+
+type ApiIndividualRankingDto struct {
 	Name         string          `json:"name"`
 	Id           int64           `json:"id"`
 	RelativeRank int64           `json:"relativeRank"`
